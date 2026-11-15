@@ -504,7 +504,7 @@ class JVMYouTubeBackend(
             uploaderName = info.uploaderName.orEmpty(),
             uploaderUrl = info.uploaderUrl,
             uploaderAvatarUrl = DesktopImageStrategy.choosePreferredImage(info.uploaderAvatars),
-            subscriberCount = info.subscriberCount,
+            subscriberCount = info.uploaderSubscriberCount,
             viewCount = info.viewCount,
             uploadDateText = info.textualUploadDate,
             isoUploadDate = isoDate,

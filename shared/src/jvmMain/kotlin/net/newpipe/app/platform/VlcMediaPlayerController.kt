@@ -189,7 +189,7 @@ class VlcMediaPlayerController(
                             val currentState = _state.value
                             mp.audio().setVolume(currentState.volume)
                             mp.audio().setMute(currentState.isMuted)
-                            mp.controls().setRate(currentState.playbackSpeed)
+                            mp.controls().setRate(currentState.playbackRate)
                         }
                     }
                 }
