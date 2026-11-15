@@ -24,10 +24,27 @@ compose.desktop {
     application {
         mainClass = "net.newpipe.app.MainKt"
 
+        jvmArgs += listOf(
+            "-Dfile.encoding=UTF-8",
+            "-Dsun.awt.noerasebackground=true"
+        )
+
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = NEWPIPE_APPLICATION_ID_NEW
+            targetFormats(TargetFormat.Msi, TargetFormat.Exe)
+            packageName = "NewPipe"
             packageVersion = NEWPIPE_VERSION_NAME
+            description = "Libre lightweight streaming front-end for Windows"
+            vendor = "NewPipe e.V."
+            includeAllModules = true
+
+            windows {
+                menuGroup = "NewPipe"
+                shortcut = true
+                dirChooser = true
+                perUserInstall = true
+                upgradeUuid = "9a3d5a3e-6b4e-4d1c-9a51-202604010001"
+                iconFile.set(project.file("src/main/resources/newpipe.ico"))
+            }
         }
     }
 }

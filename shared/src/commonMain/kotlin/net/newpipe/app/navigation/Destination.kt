@@ -15,6 +15,30 @@ import kotlinx.serialization.Serializable
 sealed interface Destination : NavKey {
 
     @Serializable
+    data object Home : Destination
+
+    @Serializable
+    data class Search(val initialQuery: String = "") : Destination
+
+    @Serializable
+    data object Subscriptions : Destination
+
+    @Serializable
+    data object History : Destination
+
+    @Serializable
+    data object Downloads : Destination
+
+    @Serializable
+    data class VideoDetail(val url: String, val initialTitle: String = "") : Destination
+
+    @Serializable
+    data class ChannelDetail(val url: String, val initialName: String = "") : Destination
+
+    @Serializable
+    data class PlaylistDetail(val url: String, val initialName: String = "") : Destination
+
+    @Serializable
     data object BackupRestoreSettings : Destination
 
     @Serializable
