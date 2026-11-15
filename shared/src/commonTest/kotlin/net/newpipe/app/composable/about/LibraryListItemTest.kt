@@ -14,6 +14,9 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 import net.newpipe.app.model.Developer
 import net.newpipe.app.model.Library
+import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.license
+import org.jetbrains.compose.resources.getString
 
 @OptIn(ExperimentalTestApi::class)
 class LibraryListItemTest {
@@ -29,7 +32,11 @@ class LibraryListItemTest {
             licenses = listOf("Apache-2.0"),
             website = "https://www.example.com"
         )
-        val desc = "By ${library.developers.first().name} under ${library.licenses.first()}"
+        val desc = getString(
+            Res.string.license,
+            library.developers.first().name,
+            library.licenses.first()
+        )
         var clicked = false
         setContent {
             LibraryListItem(

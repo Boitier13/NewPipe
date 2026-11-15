@@ -191,21 +191,21 @@ object DesktopStreamHelper {
 
         val initial = orderedLists.flatten().filter { stream ->
             showHigherResolutions ||
-                !HIGH_RESOLUTION_SET.contains(stream.resolution.replace(Regex("p\\d+$"), "p"))
+                !HIGH_RESOLUTION_SET.contains(stream.getResolution().replace(Regex("p\\d+$"), "p"))
         }
 
         val byResolution = LinkedHashMap<String, VideoStream>()
         for (stream in initial) {
-            byResolution[stream.resolution] = stream
+            byResolution[stream.getResolution()] = stream
         }
         for (stream in initial) {
             if (stream.format == defaultFormat) {
-                byResolution[stream.resolution] = stream
+                byResolution[stream.getResolution()] = stream
             }
         }
 
         val cmp = Comparator<VideoStream> { a, b ->
-            val resCmp = compareResolution(a.resolution, b.resolution)
+            val resCmp = compareResolution(a.getResolution(), b.getResolution())
             if (resCmp != 0) resCmp else {
                 VIDEO_FORMAT_QUALITY_RANKING.indexOf(a.format) - VIDEO_FORMAT_QUALITY_RANKING.indexOf(b.format)
             }
@@ -239,7 +239,7 @@ object DesktopStreamHelper {
         var lowerResNoRefresh = -1
 
         for ((idx, stream) in sortedStreams.withIndex()) {
-            val res = stream.resolution
+            val res = stream.getResolution()
             val resNoRefresh = res.replace(Regex("p\\d+$"), "p")
             val formatMatch = defaultFormat != null && stream.format == defaultFormat
 
@@ -308,7 +308,7 @@ object DesktopStreamHelper {
         videoStream: VideoStream,
         limitDataUsage: Boolean
     ): AudioStream? {
-        if (!videoStream.isVideoOnly) return null
+        if (!videoStream.isVideoOnly()) return null
         val candidates = when (videoStream.format) {
             MediaFormat.MPEG_4 -> audioStreams.filter { it.format == MediaFormat.M4A }
             MediaFormat.WEBM -> audioStreams.filter {

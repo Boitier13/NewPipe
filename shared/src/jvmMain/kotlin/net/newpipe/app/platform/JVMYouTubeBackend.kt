@@ -529,11 +529,11 @@ class JVMYouTubeBackend(
         val format = stream.format ?: MediaFormat.MPEG_4
         val audioBytes = pairedAudio?.let { estimateStreamSize(it.averageBitrate * 1000, durationSeconds) } ?: -1L
         return VideoStreamOption(
-            id = "v_${index}_${stream.resolution}_${format.name}",
-            resolution = stream.resolution,
+            id = "v_${index}_${stream.getResolution()}_${format.name}",
+            resolution = stream.getResolution(),
             formatLabel = format.getName(),
             formatKey = format.name,
-            isVideoOnly = stream.isVideoOnly,
+            isVideoOnly = stream.isVideoOnly(),
             videoUrl = stream.content,
             pairedAudioUrl = pairedAudio?.content,
             pairedAudioFormatKey = pairedAudio?.format?.name,
