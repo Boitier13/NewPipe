@@ -76,6 +76,9 @@ class VlcMediaPlayerController(
     @Volatile
     private var audioComponent: AudioPlayerComponent? = null
 
+    private val videoLock = Any()
+    private val audioLock = Any()
+
     @Volatile
     private var activeLocalFilePath: String? = null
 
@@ -118,38 +121,44 @@ class VlcMediaPlayerController(
     private fun getOrCreateVideoSurface(): EmbeddedMediaPlayerComponent? {
         if (!ensureVlcDiscovered()) return null
         videoComponent?.let { return it }
-        return synchronized(this) {
-            videoComponent ?: runCatching {
-                val createBlock = {
+
+        val createOnEdt: () -> EmbeddedMediaPlayerComponent? = {
+            synchronized(videoLock) {
+                videoComponent ?: runCatching {
                     val comp = EmbeddedMediaPlayerComponent()
+                    comp.background = java.awt.Color.BLACK
                     attachListeners(comp.mediaPlayer(), PlayerPlaybackMode.VIDEO)
+                    videoComponent = comp
                     comp
-                }
-                val created = if (SwingUtilities.isEventDispatchThread()) {
-                    createBlock()
-                } else {
-                    var holder: EmbeddedMediaPlayerComponent? = null
-                    SwingUtilities.invokeAndWait { holder = createBlock() }
-                    holder!!
-                }
-                videoComponent = created
-                created
+                }.onFailure { err ->
+                    Logger.e(err) { "Failed to initialize VLC EmbeddedMediaPlayerComponent" }
+                    _state.update {
+                        it.copy(
+                            vlcAvailable = false,
+                            errorMessage = err.message ?: missingVlcMessage()
+                        )
+                    }
+                }.getOrNull()
+            }
+        }
+
+        return if (SwingUtilities.isEventDispatchThread()) {
+            createOnEdt()
+        } else {
+            var holder: EmbeddedMediaPlayerComponent? = null
+            runCatching {
+                SwingUtilities.invokeAndWait { holder = createOnEdt() }
             }.onFailure { err ->
-                Logger.e(err) { "Failed to initialize VLC EmbeddedMediaPlayerComponent" }
-                _state.update {
-                    it.copy(
-                        vlcAvailable = false,
-                        errorMessage = err.message ?: missingVlcMessage()
-                    )
-                }
-            }.getOrNull()
+                Logger.e(err) { "Failed dispatching VLC surface creation to EDT" }
+            }
+            holder
         }
     }
 
     private fun getOrCreateAudioPlayer(): AudioPlayerComponent? {
         if (!ensureVlcDiscovered()) return null
         audioComponent?.let { return it }
-        return synchronized(this) {
+        return synchronized(audioLock) {
             audioComponent ?: runCatching {
                 val comp = AudioPlayerComponent()
                 attachListeners(comp.mediaPlayer(), PlayerPlaybackMode.BACKGROUND_AUDIO)
@@ -611,8 +620,9 @@ class VlcMediaPlayerController(
         val surface = remember(playerState.vlcAvailable) { getOrCreateVideoSurface() }
         if (surface != null) {
             SwingPanel(
-                background = Color.Black,
-                factory = { surface },
+                factory = {
+                    surface.apply { background = java.awt.Color.BLACK }
+                },
                 modifier = modifier
             )
         } else {

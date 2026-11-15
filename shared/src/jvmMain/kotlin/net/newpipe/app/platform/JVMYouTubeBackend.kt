@@ -7,12 +7,20 @@ package net.newpipe.app.platform
 
 import co.touchlab.kermit.Logger
 import com.russhwolf.settings.Settings
+import java.io.IOException
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import net.newpipe.app.model.AudioStreamOption
 import net.newpipe.app.model.ChannelDetails
 import net.newpipe.app.model.ChannelSummary
@@ -67,6 +75,9 @@ class JVMYouTubeBackend(
     )
 
     private val pageTokens = ConcurrentHashMap<String, CachedPageContext>()
+    private val backendExecutor = Executors.newCachedThreadPool { runnable ->
+        Thread(runnable, "NewPipe-Extractor").apply { isDaemon = true }
+    }
 
     @Volatile
     private var initialized = false
@@ -155,37 +166,70 @@ class JVMYouTubeBackend(
     override suspend fun getTrendingVideos(pageToken: String?): Result<SearchPageResult> =
         withContext(Dispatchers.IO) {
             ensureInitialized()
-            runCatching {
+            safeBackendCall("trending") {
                 val yt = ServiceList.YouTube
                 val kioskList = yt.kioskList
-                val kioskId = kioskList.defaultKioskId
-                val kioskUrl = kioskList.getListLinkHandlerFactoryByType(kioskId)
-                    .fromId(kioskId)
-                    .url
 
                 val items: List<InfoItem>
                 val nextPage: Page?
                 val hasNext: Boolean
+                val usedKioskUrl: String
 
                 if (pageToken != null) {
                     val ctx = pageTokens.remove(pageToken)
                         ?: error("Expired page token")
-                    val page = KioskInfo.getMoreItems(yt, ctx.url.ifBlank { kioskUrl }, ctx.page)
+                    usedKioskUrl = ctx.url
+                    val page = KioskInfo.getMoreItems(yt, usedKioskUrl, ctx.page)
                     items = page.items
                     nextPage = page.nextPage
                     hasNext = page.hasNextPage()
                 } else {
-                    val cached = infoCache.get(yt.serviceId, kioskUrl, DesktopInfoCache.Type.KIOSK) as? KioskInfo
-                    val info = cached ?: KioskInfo.getInfo(yt, kioskUrl).also {
-                        infoCache.put(yt.serviceId, kioskUrl, it, DesktopInfoCache.Type.KIOSK)
+                    val candidateIds = listOf(
+                        "Trending",
+                        "trending_music",
+                        "trending_gaming",
+                        "trending_movies_and_shows",
+                        kioskList.defaultKioskId
+                    ).distinct()
+
+                    var loadedInfo: KioskInfo? = null
+                    var loadedUrl: String? = null
+                    var lastError: Throwable? = null
+
+                    for (kioskId in candidateIds) {
+                        val factory = runCatching {
+                            kioskList.getListLinkHandlerFactoryByType(kioskId)
+                        }.getOrNull() ?: continue
+                        val url = runCatching { factory.fromId(kioskId).url }.getOrNull() ?: continue
+                        val cached = infoCache.get(yt.serviceId, url, DesktopInfoCache.Type.KIOSK) as? KioskInfo
+                        val attempt = if (cached != null) {
+                            Result.success(cached)
+                        } else {
+                            runCatching {
+                                KioskInfo.getInfo(yt, url).also {
+                                    infoCache.put(yt.serviceId, url, it, DesktopInfoCache.Type.KIOSK)
+                                }
+                            }
+                        }
+                        val info = attempt.getOrNull()
+                        if (info != null && info.relatedItems.isNotEmpty()) {
+                            loadedInfo = info
+                            loadedUrl = url
+                            break
+                        } else if (attempt.isFailure) {
+                            lastError = attempt.exceptionOrNull()
+                        }
                     }
+
+                    val info = loadedInfo ?: throw (lastError ?: IllegalStateException("No YouTube kiosk items available"))
+                    usedKioskUrl = loadedUrl.orEmpty()
                     items = info.relatedItems
                     nextPage = info.nextPage
                     hasNext = info.hasNextPage()
                 }
 
-                val nextToken = if (hasNext && nextPage != null) {
-                    savePageToken(CachedPageContext(page = nextPage, url = kioskUrl))
+                val nextToken = if (hasNext && nextPage != null && usedKioskUrl.isNotBlank()) {
+                    savePageToken(CachedPageContext(page = nextPage, url = usedKioskUrl))
                 } else {
                     null
                 }
@@ -194,8 +238,6 @@ class JVMYouTubeBackend(
                     hasNextPage = hasNext && nextToken != null,
                     nextPageToken = nextToken
                 )
-            }.onFailure {
-                Logger.e(it) { "Failed to load YouTube trending kiosk" }
             }
         }
 
@@ -205,7 +247,7 @@ class JVMYouTubeBackend(
         pageToken: String?
     ): Result<SearchPageResult> = withContext(Dispatchers.IO) {
         ensureInitialized()
-        runCatching {
+        safeBackendCall("search '$query'") {
             val yt = ServiceList.YouTube
             val contentFilters = listOfNotNull(filter.extractorFilter)
             val handler = yt.searchQHFactory.fromQuery(query, contentFilters, "")
@@ -238,8 +280,6 @@ class JVMYouTubeBackend(
                 hasNextPage = hasNext && nextToken != null,
                 nextPageToken = nextToken
             )
-        }.onFailure {
-            Logger.e(it) { "YouTube search failed for '$query'" }
         }
     }
 
@@ -247,7 +287,9 @@ class JVMYouTubeBackend(
         if (query.isBlank()) return@withContext emptyList()
         ensureInitialized()
         runCatching {
-            ServiceList.YouTube.suggestionExtractor?.suggestionList(query).orEmpty()
+            withTimeout(8_000L) {
+                ServiceList.YouTube.suggestionExtractor?.suggestionList(query).orEmpty()
+            }
         }.getOrElse { emptyList() }
     }
 
@@ -256,7 +298,8 @@ class JVMYouTubeBackend(
         forceReload: Boolean
     ): Result<VideoDetails> = withContext(Dispatchers.IO) {
         ensureInitialized()
-        runCatching {
+        safeBackendCall("video '$url'") {
+            println("[NewPipe] Extracting video details: $url")
             val yt = ServiceList.YouTube
             val cached = if (!forceReload) {
                 infoCache.get(yt.serviceId, url, DesktopInfoCache.Type.STREAM) as? StreamInfo
@@ -267,10 +310,44 @@ class JVMYouTubeBackend(
             val info = cached ?: StreamInfo.getInfo(yt, url).also {
                 infoCache.put(yt.serviceId, url, it, DesktopInfoCache.Type.STREAM)
             }
+            mapStreamInfoToVideoDetails(info).also {
+                println("[NewPipe] Extracted '${it.title}': ${it.videoStreams.size} video streams, ${it.audioStreams.size} audio streams")
+            }
+        }
+    }
 
-            mapStreamInfoToVideoDetails(info)
-        }.onFailure {
-            Logger.e(it) { "Failed to extract video details for $url" }
+    private suspend fun <T> safeBackendCall(
+        label: String,
+        timeoutMs: Long = 25_000L,
+        block: () -> T
+    ): Result<T> {
+        return try {
+            val value = withTimeout(timeoutMs) {
+                suspendCancellableCoroutine<T> { cont ->
+                    val future = backendExecutor.submit {
+                        try {
+                            val res = block()
+                            if (cont.isActive) cont.resume(res)
+                        } catch (t: Throwable) {
+                            if (cont.isActive) cont.resumeWithException(t)
+                        }
+                    }
+                    cont.invokeOnCancellation { future.cancel(true) }
+                }
+            }
+            Result.success(value)
+        } catch (t: TimeoutCancellationException) {
+            val err = IOException("Timed out after ${timeoutMs / 1000}s while loading $label", t)
+            Logger.e(err) { err.message.orEmpty() }
+            System.err.println("[NewPipe] ${err.message}")
+            Result.failure(err)
+        } catch (c: CancellationException) {
+            throw c
+        } catch (t: Throwable) {
+            Logger.e(t) { "Failed loading $label" }
+            System.err.println("[NewPipe] Failed loading $label: ${t.javaClass.simpleName}: ${t.message}")
+            t.printStackTrace(System.err)
+            Result.failure(t)
         }
     }
 
@@ -476,7 +553,7 @@ class JVMYouTubeBackend(
         )
 
         val videoOptions = sortedVideo.mapIndexed { idx, vs ->
-            val pairedAudio = if (vs.isVideoOnly) {
+            val pairedAudio = if (vs.isVideoOnly()) {
                 DesktopStreamHelper.findCompatibleAudioForVideo(sortedAudio, vs, dataSaver)
             } else {
                 null

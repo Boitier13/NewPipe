@@ -6,9 +6,11 @@
 package net.newpipe.app.platform
 
 import java.io.IOException
+import java.net.Inet4Address
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import okhttp3.CompressionInterceptor
+import okhttp3.Dns
 import okhttp3.Gzip
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
@@ -28,9 +30,17 @@ class DesktopDownloader : Downloader() {
 
     private val cookies = ConcurrentHashMap<String, String>()
 
+    private val ipv4FirstDns = Dns { hostname ->
+        val all = Dns.SYSTEM.lookup(hostname)
+        all.sortedBy { if (it is Inet4Address) 0 else 1 }
+    }
+
     val client: OkHttpClient = OkHttpClient.Builder()
-        .readTimeout(30, TimeUnit.SECONDS)
-        .connectTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
+        .dns(ipv4FirstDns)
         .addInterceptor(CompressionInterceptor(Brotli, Gzip))
         .build()
 
