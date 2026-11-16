@@ -12,8 +12,13 @@ import java.io.File
  */
 object WindowsAppPaths {
 
+    private const val PROP_APP_RESOURCES_DIR = "compose.application.resources.dir"
+
     val isWindows: Boolean
         get() = System.getProperty("os.name").orEmpty().lowercase().startsWith("windows")
+
+    private val isMac: Boolean
+        get() = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
 
     fun appDataDir(): File {
         val dir = if (isWindows) {
@@ -62,13 +67,81 @@ object WindowsAppPaths {
         return dir
     }
 
-    fun candidateVlcDirectories(customPath: String? = null): List<File> {
+    fun bundledResourcesDir(
+        resourcesDirProperty: String? = System.getProperty(PROP_APP_RESOURCES_DIR),
+        javaHomeProperty: String? = System.getProperty("java.home")
+    ): File? {
+        resourcesDirProperty?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
+            val dir = File(raw)
+            if (dir.isDirectory) return dir
+        }
+        javaHomeProperty?.trim()?.takeIf { it.isNotEmpty() }?.let { home ->
+            val appRoot = File(home).parentFile
+            if (appRoot != null) {
+                val candidates = listOf(
+                    File(appRoot, "app/resources"),
+                    File(appRoot, "lib/app/resources"),
+                    File(appRoot, "resources")
+                )
+                candidates.firstOrNull { it.isDirectory }?.let { return it }
+            }
+        }
+        return null
+    }
+
+    fun bundledVlcDirectory(
+        bundledDir: File? = bundledResourcesDir(),
+        windows: Boolean = isWindows,
+        mac: Boolean = isMac
+    ): File? {
+        if (bundledDir == null || !bundledDir.isDirectory) return null
+        return listOf(File(bundledDir, "vlc"), bundledDir)
+            .firstOrNull { dir -> dir.isDirectory && hasVlcNativeLibraries(dir, windows, mac) }
+    }
+
+    fun bundledFfmpegExecutable(
+        bundledDir: File? = bundledResourcesDir(),
+        windows: Boolean = isWindows
+    ): File? {
+        if (bundledDir == null || !bundledDir.isDirectory) return null
+        val exeName = if (windows) "ffmpeg.exe" else "ffmpeg"
+        return listOf(
+            File(bundledDir, "ffmpeg/$exeName"),
+            File(bundledDir, exeName)
+        ).firstOrNull { isValidExecutable(it, windows) }
+    }
+
+    internal fun hasVlcNativeLibraries(
+        dir: File,
+        windows: Boolean = isWindows,
+        mac: Boolean = isMac
+    ): Boolean {
+        if (!dir.isDirectory) return false
+        return when {
+            windows -> File(dir, "libvlc.dll").isFile && File(dir, "libvlccore.dll").isFile
+            mac -> File(dir, "libvlc.dylib").isFile
+            else -> File(dir, "libvlc.so").isFile ||
+                dir.listFiles()?.any { it.isFile && it.name.startsWith("libvlc.so.") } == true
+        }
+    }
+
+    private fun isValidExecutable(file: File, windows: Boolean = isWindows): Boolean =
+        file.isFile && (windows || file.canExecute())
+
+    @JvmOverloads
+    fun candidateVlcDirectories(
+        customPath: String? = null,
+        bundledDir: File? = bundledResourcesDir(),
+        windows: Boolean = isWindows,
+        mac: Boolean = isMac
+    ): List<File> {
         val candidates = mutableListOf<File>()
         if (!customPath.isNullOrBlank()) {
             val custom = File(customPath.trim())
             candidates.add(if (custom.isFile) custom.parentFile else custom)
         }
-        if (isWindows) {
+        bundledVlcDirectory(bundledDir, windows = windows, mac = mac)?.let { candidates.add(it) }
+        if (windows) {
             listOfNotNull(
                 System.getenv("ProgramFiles"),
                 System.getenv("ProgramFiles(x86)"),
@@ -85,28 +158,38 @@ object WindowsAppPaths {
             candidates.add(File("/usr/lib/x86_64-linux-gnu"))
             candidates.add(File("/Applications/VLC.app/Contents/MacOS/lib"))
         }
-        return candidates.filter { it.exists() && it.isDirectory }
+        return candidates
+            .filter { it.exists() && it.isDirectory }
+            .distinctBy { runCatching { it.canonicalPath }.getOrElse { it.absolutePath } }
     }
 
-    fun findFfmpegExecutable(customPath: String? = null): File? {
+    @JvmOverloads
+    fun findFfmpegExecutable(
+        customPath: String? = null,
+        bundledDir: File? = bundledResourcesDir(),
+        pathEnv: String? = System.getenv("PATH"),
+        windows: Boolean = isWindows
+    ): File? {
+        val exeName = if (windows) "ffmpeg.exe" else "ffmpeg"
         if (!customPath.isNullOrBlank()) {
             val f = File(customPath.trim())
-            if (f.isFile && f.canExecute()) return f
+            if (isValidExecutable(f, windows)) return f
             if (f.isDirectory) {
-                val exe = File(f, if (isWindows) "ffmpeg.exe" else "ffmpeg")
-                if (exe.isFile && exe.canExecute()) return exe
+                val exe = File(f, exeName)
+                if (isValidExecutable(exe, windows)) return exe
             }
         }
 
-        val exeName = if (isWindows) "ffmpeg.exe" else "ffmpeg"
-        val pathEnv = System.getenv("PATH").orEmpty()
-        pathEnv.split(File.pathSeparatorChar)
+        bundledFfmpegExecutable(bundledDir, windows)?.let { return it }
+
+        pathEnv.orEmpty()
+            .split(File.pathSeparatorChar)
             .filter { it.isNotBlank() }
             .map { File(it.trim(), exeName) }
-            .firstOrNull { it.isFile && it.canExecute() }
+            .firstOrNull { isValidExecutable(it, windows) }
             ?.let { return it }
 
-        if (isWindows) {
+        if (windows) {
             val home = System.getProperty("user.home")
             val localAppData = System.getenv("LOCALAPPDATA").orEmpty()
             val windowsCandidates = listOfNotNull(
@@ -120,7 +203,7 @@ object WindowsAppPaths {
         } else {
             listOf("/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg")
                 .map(::File)
-                .firstOrNull { it.isFile && it.canExecute() }
+                .firstOrNull { isValidExecutable(it, windows = false) }
                 ?.let { return it }
         }
         return null

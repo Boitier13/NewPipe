@@ -3,6 +3,7 @@ local.properties
 .DS_Store
 **/build/
 !src/**/build/
+desktopApp/app-resources/
 captures/
 .idea/
 *.iml

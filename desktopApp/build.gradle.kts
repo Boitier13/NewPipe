@@ -38,6 +38,7 @@ compose.desktop {
             description = "Libre lightweight streaming front-end for Windows"
             vendor = "NewPipe e.V."
             includeAllModules = true
+            appResourcesRootDir.set(project.layout.projectDirectory.dir("app-resources"))
 
             windows {
                 menuGroup = "NewPipe"
