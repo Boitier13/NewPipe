@@ -17,8 +17,17 @@ import net.newpipe.app.model.VideoStreamOption
  * Pure JVM muxing bridge implemented in desktopApp using migrated NewPipe stream writers.
  */
 interface StreamMuxer {
-    fun muxMp4FromDash(videoPath: String, audioPath: String, outputPath: String)
-    fun remuxM4aFromDash(audioPath: String, outputPath: String)
+    fun muxMp4FromDash(
+        videoPath: String,
+        audioPath: String,
+        outputPath: String,
+        onProgress: ((fraction: Float) -> Unit)? = null
+    )
+    fun remuxM4aFromDash(
+        audioPath: String,
+        outputPath: String,
+        onProgress: ((fraction: Float) -> Unit)? = null
+    )
     fun muxWebm(videoPath: String, audioPath: String, outputPath: String)
     fun demuxOggFromWebm(
         sourcePath: String,

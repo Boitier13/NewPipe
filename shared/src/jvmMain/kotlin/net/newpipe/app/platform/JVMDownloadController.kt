@@ -11,6 +11,9 @@ import java.awt.Desktop
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import net.newpipe.app.model.AudioStreamOption
@@ -41,8 +45,8 @@ import okhttp3.Request
 import org.koin.core.annotation.Singleton
 
 /**
- * Windows/PC download manager supporting MP4 (DASH muxing + FFmpeg fallback),
- * MP3 (FFmpeg libmp3lame conversion), and native M4A/OGG-Opus audio downloads.
+ * Windows/PC download manager supporting MP4 (FFmpeg fast-mux + buffered Java DASH fallback),
+ * MP3/FLAC/WAV (FFmpeg conversion), and native M4A/OGG-Opus audio downloads.
  */
 @Singleton(binds = [DownloadController::class])
 class JVMDownloadController(
@@ -53,7 +57,19 @@ class JVMDownloadController(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
-    private val concurrencySemaphore = Semaphore(3)
+    private val serialSemaphore = Semaphore(1)
+    private val parallelSemaphore = Semaphore(3)
+    private val logLock = Any()
+
+    private fun queueSemaphore(): Semaphore =
+        if (settings.getBoolean(
+                DownloadPreferences.KEY_LIMIT_QUEUE,
+                DownloadPreferences.DEFAULT_LIMIT_QUEUE
+            )
+        ) serialSemaphore else parallelSemaphore
+
+    // Mesure de vitesse par téléchargement : [instant (ms), octets, vitesse lissée (octets/s)]
+    private val speedMarks = ConcurrentHashMap<String, LongArray>()
 
     private val _tasks = MutableStateFlow<List<DownloadTaskItem>>(emptyList())
     override val tasks: StateFlow<List<DownloadTaskItem>> = _tasks.asStateFlow()
@@ -84,19 +100,8 @@ class JVMDownloadController(
         addTask(initial)
 
         val job = scope.launch {
-            val permitLimit = if (settings.getBoolean(
-                    DownloadPreferences.KEY_LIMIT_QUEUE,
-                    DownloadPreferences.DEFAULT_LIMIT_QUEUE
-                )
-            ) 1 else 0
-
-            val block: suspend () -> Unit = {
+            queueSemaphore().withPermit {
                 executeMp4Download(taskId, details, videoOption, outputFile)
-            }
-            if (permitLimit > 0) {
-                concurrencySemaphore.withPermit { block() }
-            } else {
-                block()
             }
         }
         jobs[taskId] = job
@@ -152,10 +157,7 @@ class JVMDownloadController(
             null
         }
 
-        val effectiveOption = when {
-            matchingNativeM4a != null -> matchingNativeM4a
-            else -> resolvedOption
-        }
+        val effectiveOption = matchingNativeM4a ?: resolvedOption
 
         val defaultMp3Kbps = settings.getString(
             DesktopPreferences.KEY_MP3_BITRATE,
@@ -200,7 +202,7 @@ class JVMDownloadController(
         addTask(initial)
 
         val job = scope.launch {
-            concurrencySemaphore.withPermit {
+            queueSemaphore().withPermit {
                 executeAudioDownload(
                     taskId = taskId,
                     details = details,
@@ -218,7 +220,7 @@ class JVMDownloadController(
         jobs.remove(taskId)?.cancel()
         updateTask(taskId) {
             if (it.status != DownloadStatus.COMPLETED && it.status != DownloadStatus.FAILED) {
-                it.copy(status = DownloadStatus.CANCELLED, statusMessage = "Cancelled")
+                it.copy(status = DownloadStatus.CANCELLED, statusMessage = "Annulé")
             } else {
                 it
             }
@@ -279,35 +281,45 @@ class JVMDownloadController(
         outputFile: File
     ) {
         val tempFiles = mutableListOf<File>()
+        logDownload(
+            "[$taskId] MP4 start: title='${details.title}', res=${option.resolution}, " +
+                "format=${option.formatKey}, videoOnly=${option.isVideoOnly}, " +
+                "duration=${details.durationSeconds}s, out='${outputFile.absolutePath}'"
+        )
         try {
             updateTask(taskId) {
                 it.copy(
                     status = DownloadStatus.DOWNLOADING,
                     progress = 0.01f,
-                    statusMessage = "Downloading..."
+                    statusMessage = "Téléchargement..."
                 )
             }
 
-            val pairedAudioUrl = if (option.isVideoOnly) {
-                option.pairedAudioUrl ?: details.audioStreams.firstOrNull()?.url
+            val fallbackAudio = if (option.isVideoOnly && option.pairedAudioUrl == null) {
+                details.audioStreams.firstOrNull()
             } else {
                 null
             }
+            val pairedAudioUrl = if (option.isVideoOnly) {
+                option.pairedAudioUrl ?: fallbackAudio?.url
+            } else {
+                null
+            }
+            val pairedAudioFormatKey = option.pairedAudioFormatKey ?: fallbackAudio?.formatKey
 
             val isHls = option.formatKey == "HLS" || option.videoUrl.contains(".m3u8")
             val targetScaleHeight = option.targetScaleHeight
 
             if (isHls) {
-                val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
-                    settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
-                ) ?: throw IOException(
-                    "FFmpeg required for HLS stream download. Install FFmpeg or choose a direct MP4 stream."
-                )
+                val ffmpeg = findAndLogFfmpeg(taskId)
+                    ?: throw IOException(
+                        "FFmpeg requis pour télécharger un flux HLS. Installez FFmpeg ou choisissez un flux MP4 direct."
+                    )
                 updateTask(taskId) {
                     it.copy(
                         status = DownloadStatus.TRANSCODING,
                         progress = 0.02f,
-                        statusMessage = "Downloading & muxing HLS..."
+                        statusMessage = "Téléchargement et assemblage HLS..."
                     )
                 }
                 val args = mutableListOf("-y", "-i", option.videoUrl)
@@ -327,13 +339,22 @@ class JVMDownloadController(
                     args += listOf("-c", "copy")
                 }
                 args += listOf("-movflags", "+faststart", outputFile.absolutePath)
+                var maxProgress = 0.02f
                 runFfmpeg(
+                    taskId = taskId,
                     ffmpegExe = ffmpeg,
                     args = args,
                     durationSeconds = details.durationSeconds
-                ) { fraction, totalSize ->
+                ) { fraction, totalSize, outTimeUs ->
+                    val p = maxOf(maxProgress, (0.02f + 0.96f * fraction).coerceIn(0.02f, 0.99f))
+                    maxProgress = p
+                    val detail = formatFfmpegProgressSuffix(
+                        fraction = fraction,
+                        durationSeconds = details.durationSeconds,
+                        outTimeUs = outTimeUs,
+                        totalSizeBytes = totalSize
+                    )
                     updateTask(taskId) { current ->
-                        val p = (0.02f + 0.96f * fraction).coerceIn(0.02f, 0.99f)
                         val bytes = if (totalSize > 0L) totalSize else current.downloadedBytes
                         current.copy(
                             progress = p,
@@ -342,6 +363,11 @@ class JVMDownloadController(
                                 (bytes / fraction).toLong().coerceAtLeast(bytes)
                             } else {
                                 current.totalBytes
+                            },
+                            statusMessage = if (detail.isNotEmpty()) {
+                                "Téléchargement et assemblage HLS... $detail"
+                            } else {
+                                "Téléchargement et assemblage HLS..."
                             }
                         )
                     }
@@ -357,21 +383,21 @@ class JVMDownloadController(
                     downloadToFile(option.videoUrl, tmpVideo) { downloaded, total ->
                         updateProgress(taskId, downloaded, total, maxProgress = downloadMax)
                     }
-                    val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
-                        settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
-                    )
+                    val ffmpeg = findAndLogFfmpeg(taskId)
                     if (targetScaleHeight != null) {
                         val exe = ffmpeg ?: throw IOException(
-                            "FFmpeg required to convert video to ${targetScaleHeight}p."
+                            "FFmpeg requis pour convertir la vidéo en ${targetScaleHeight}p."
                         )
+                        var maxProgress = downloadMax
                         updateTask(taskId) {
                             it.copy(
                                 status = DownloadStatus.TRANSCODING,
                                 progress = downloadMax,
-                                statusMessage = "Encoding ${targetScaleHeight}p MP4..."
+                                statusMessage = "Encodage ${targetScaleHeight}p (peut être très long sur ce PC)..."
                             )
                         }
                         runFfmpeg(
+                            taskId = taskId,
                             ffmpegExe = exe,
                             args = listOf(
                                 "-y",
@@ -386,22 +412,53 @@ class JVMDownloadController(
                                 outputFile.absolutePath
                             ),
                             durationSeconds = details.durationSeconds
-                        ) { fraction, _ ->
+                        ) { fraction, totalSize, outTimeUs ->
+                            val nextP = maxOf(
+                                maxProgress,
+                                (downloadMax + (0.99f - downloadMax) * fraction).coerceIn(downloadMax, 0.99f)
+                            )
+                            maxProgress = nextP
+                            val detail = formatFfmpegProgressSuffix(
+                                fraction = fraction,
+                                durationSeconds = details.durationSeconds,
+                                outTimeUs = outTimeUs,
+                                totalSizeBytes = totalSize
+                            )
                             updateTask(taskId) {
-                                it.copy(progress = (downloadMax + (0.99f - downloadMax) * fraction).coerceIn(downloadMax, 0.99f))
+                                it.copy(
+                                    progress = nextP,
+                                    statusMessage = if (detail.isNotEmpty()) {
+                                        "Encodage ${targetScaleHeight}p ($detail)"
+                                    } else {
+                                        "Encodage ${targetScaleHeight}p..."
+                                    }
+                                )
                             }
                         }
                     } else if (ffmpeg != null) {
+                        var maxProgress = 0.92f
                         updateTask(taskId) {
-                            it.copy(status = DownloadStatus.MUXING, progress = 0.94f, statusMessage = "Converting to MP4...")
+                            it.copy(status = DownloadStatus.MUXING, progress = 0.92f, statusMessage = "Conversion en MP4...")
                         }
                         runFfmpeg(
+                            taskId = taskId,
                             ffmpegExe = ffmpeg,
                             args = listOf("-y", "-i", tmpVideo.absolutePath, "-c", "copy", "-movflags", "+faststart", outputFile.absolutePath),
                             durationSeconds = details.durationSeconds
-                        ) { fraction, _ ->
+                        ) { fraction, totalSize, outTimeUs ->
+                            val nextP = maxOf(maxProgress, (0.92f + 0.07f * fraction).coerceIn(0.92f, 0.99f))
+                            maxProgress = nextP
+                            val detail = formatFfmpegProgressSuffix(
+                                fraction = fraction,
+                                durationSeconds = details.durationSeconds,
+                                outTimeUs = outTimeUs,
+                                totalSizeBytes = totalSize
+                            )
                             updateTask(taskId) {
-                                it.copy(progress = (0.94f + 0.05f * fraction).coerceIn(0.94f, 0.99f))
+                                it.copy(
+                                    progress = nextP,
+                                    statusMessage = if (detail.isNotEmpty()) "Conversion en MP4... $detail" else "Conversion en MP4..."
+                                )
                             }
                         }
                     } else {
@@ -436,7 +493,8 @@ class JVMDownloadController(
                         it.copy(
                             downloadedBytes = d,
                             totalBytes = estTotal.coerceAtLeast(d),
-                            progress = overallProgress
+                            progress = overallProgress,
+                            statusMessage = speedLabel(taskId, d)
                         )
                     }
                 }
@@ -455,25 +513,27 @@ class JVMDownloadController(
                         it.copy(
                             downloadedBytes = totalDownloaded,
                             totalBytes = estTotal.coerceAtLeast(totalDownloaded),
-                            progress = overallProgress
+                            progress = overallProgress,
+                            statusMessage = speedLabel(taskId, totalDownloaded)
                         )
                     }
                 }
 
                 if (targetScaleHeight != null) {
-                    val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
-                        settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
-                    ) ?: throw IOException(
-                        "FFmpeg required to convert video to ${targetScaleHeight}p."
-                    )
+                    val ffmpeg = findAndLogFfmpeg(taskId)
+                        ?: throw IOException(
+                            "FFmpeg requis pour convertir la vidéo en ${targetScaleHeight}p."
+                        )
+                    var maxProgress = downloadCeiling
                     updateTask(taskId) {
                         it.copy(
                             status = DownloadStatus.TRANSCODING,
                             progress = downloadCeiling,
-                            statusMessage = "Encoding ${targetScaleHeight}p MP4..."
+                            statusMessage = "Encodage ${targetScaleHeight}p (peut être très long sur ce PC)..."
                         )
                     }
                     runFfmpeg(
+                        taskId = taskId,
                         ffmpegExe = ffmpeg,
                         args = listOf(
                             "-y",
@@ -489,83 +549,183 @@ class JVMDownloadController(
                             outputFile.absolutePath
                         ),
                         durationSeconds = details.durationSeconds
-                    ) { fraction, _ ->
+                    ) { fraction, totalSize, outTimeUs ->
+                        val nextP = maxOf(
+                            maxProgress,
+                            (downloadCeiling + (0.99f - downloadCeiling) * fraction).coerceIn(downloadCeiling, 0.99f)
+                        )
+                        maxProgress = nextP
+                        val detail = formatFfmpegProgressSuffix(
+                            fraction = fraction,
+                            durationSeconds = details.durationSeconds,
+                            outTimeUs = outTimeUs,
+                            totalSizeBytes = totalSize
+                        )
                         updateTask(taskId) {
                             it.copy(
-                                progress = (downloadCeiling + (0.99f - downloadCeiling) * fraction)
-                                    .coerceIn(downloadCeiling, 0.99f)
+                                progress = nextP,
+                                statusMessage = if (detail.isNotEmpty()) {
+                                    "Encodage ${targetScaleHeight}p ($detail)"
+                                } else {
+                                    "Encodage ${targetScaleHeight}p..."
+                                }
                             )
                         }
                     }
                 } else {
+                    var maxProgressReached = 0.94f
                     updateTask(taskId) {
                         it.copy(
                             status = DownloadStatus.MUXING,
-                            progress = 0.94f,
-                            statusMessage = "Muxing video & audio..."
+                            progress = maxProgressReached,
+                            statusMessage = "Assemblage rapide (FFmpeg)..."
                         )
                     }
 
-                    val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
-                        settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
-                    )
+                    val ffmpeg = findAndLogFfmpeg(taskId)
                     val muxer = DesktopStreamMuxerRegistry.muxer
                     val compatibleMp4Pair = option.formatKey == "MPEG_4" &&
-                        (option.pairedAudioFormatKey == null || option.pairedAudioFormatKey == "M4A")
+                        (pairedAudioFormatKey == null || pairedAudioFormatKey == "M4A")
 
-                    // Prefer native FFmpeg stream-copy first when installed: handles 1h30+ videos in ~1-2s
+                    logDownload(
+                        "[$taskId] DASH mux info: videoTmp=${videoTmp.length()}B (${option.formatKey}), " +
+                            "audioTmp=${audioTmp.length()}B (${pairedAudioFormatKey ?: "unknown"}), " +
+                            "compatibleMp4Pair=$compatibleMp4Pair, muxerAvailable=${muxer != null}"
+                    )
+
                     val fastMuxOk = if (ffmpeg != null) {
                         runCatching {
                             runFfmpeg(
+                                taskId = taskId,
                                 ffmpegExe = ffmpeg,
                                 args = listOf(
                                     "-y",
                                     "-i", videoTmp.absolutePath,
                                     "-i", audioTmp.absolutePath,
                                     "-c:v", "copy",
-                                    "-c:a", if (option.pairedAudioFormatKey == "M4A") "copy" else "aac",
+                                    "-c:a", if (pairedAudioFormatKey == "M4A") "copy" else "aac",
                                     "-movflags", "+faststart",
                                     outputFile.absolutePath
                                 ),
                                 durationSeconds = details.durationSeconds
-                            ) { fraction, _ ->
+                            ) { fraction, totalSize, outTimeUs ->
+                                val nextP = maxOf(
+                                    maxProgressReached,
+                                    (0.94f + 0.05f * fraction).coerceIn(0.94f, 0.99f)
+                                )
+                                maxProgressReached = nextP
+                                val detail = formatFfmpegProgressSuffix(
+                                    fraction = fraction,
+                                    durationSeconds = details.durationSeconds,
+                                    outTimeUs = outTimeUs,
+                                    totalSizeBytes = totalSize
+                                )
                                 updateTask(taskId) {
-                                    it.copy(progress = (0.94f + 0.05f * fraction).coerceIn(0.94f, 0.99f))
+                                    it.copy(
+                                        progress = nextP,
+                                        statusMessage = if (detail.isNotEmpty()) {
+                                            "Assemblage rapide (FFmpeg)... $detail"
+                                        } else {
+                                            "Assemblage rapide (FFmpeg)..."
+                                        }
+                                    )
                                 }
                             }
                             true
-                        }.getOrElse {
-                            Logger.w(it) { "FFmpeg stream-copy mux failed, trying pure-Java muxer or re-encode" }
+                        }.getOrElse { err ->
+                            if (err is CancellationException) throw err
+                            Logger.w(err) { "FFmpeg stream-copy mux failed, trying pure-Java muxer or re-encode" }
+                            logDownload(
+                                "[$taskId] FFmpeg stream-copy failed (${err.javaClass.simpleName}: ${err.message}) -> fallback"
+                            )
+                            runCatching { outputFile.delete() }
                             false
                         }
                     } else {
+                        logDownload("[$taskId] FFmpeg not found -> skipping FFmpeg fast mux")
                         false
                     }
 
-                    val muxSucceededWithJava = !fastMuxOk && compatibleMp4Pair && muxer != null && runCatching {
-                        muxer.muxMp4FromDash(
-                            videoTmp.absolutePath,
-                            audioTmp.absolutePath,
-                            outputFile.absolutePath
+                    val muxSucceededWithJava = if (!fastMuxOk && compatibleMp4Pair && muxer != null) {
+                        val muxFloor = maxProgressReached
+                        val javaMuxStartMs = System.currentTimeMillis()
+                        logDownload(
+                            "[$taskId] Switching to Java Mp4FromDashWriter (floor=${(muxFloor * 100f).toInt()}%)"
                         )
-                        true
-                    }.getOrElse {
-                        Logger.w(it) { "Pure-Java MP4 DASH muxer failed" }
+                        updateTask(taskId) {
+                            it.copy(
+                                status = DownloadStatus.MUXING,
+                                progress = muxFloor,
+                                statusMessage = "Assemblage Java (secours)... 0 %"
+                            )
+                        }
+                        var lastJavaUiMs = 0L
+                        runCatching {
+                            runInterruptible(Dispatchers.IO) {
+                                muxer.muxMp4FromDash(
+                                    videoTmp.absolutePath,
+                                    audioTmp.absolutePath,
+                                    outputFile.absolutePath
+                                ) { frac ->
+                                    val now = System.currentTimeMillis()
+                                    if (frac >= 1f || now - lastJavaUiMs >= 500L) {
+                                        lastJavaUiMs = now
+                                        val nextP = maxOf(
+                                            maxProgressReached,
+                                            (muxFloor + (0.99f - muxFloor) * frac).coerceIn(muxFloor, 0.99f)
+                                        )
+                                        maxProgressReached = nextP
+                                        val pct = (frac * 100f).coerceIn(0f, 100f).toInt()
+                                        updateTask(taskId) {
+                                            it.copy(
+                                                status = DownloadStatus.MUXING,
+                                                progress = nextP,
+                                                statusMessage = "Assemblage Java (secours)... $pct %"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            logDownload(
+                                "[$taskId] Java Mp4FromDashWriter succeeded in ${System.currentTimeMillis() - javaMuxStartMs} ms"
+                            )
+                            true
+                        }.getOrElse { err ->
+                            if (err is CancellationException) throw err
+                            Logger.w(err) { "Pure-Java MP4 DASH muxer failed" }
+                            logDownload(
+                                "[$taskId] Java Mp4FromDashWriter FAILED after ${System.currentTimeMillis() - javaMuxStartMs} ms: " +
+                                    "${err.javaClass.simpleName}: ${err.message}"
+                            )
+                            runCatching { outputFile.delete() }
+                            false
+                        }
+                    } else {
+                        if (!fastMuxOk) {
+                            logDownload(
+                                "[$taskId] Skipping Java Mp4FromDashWriter (compatibleMp4Pair=$compatibleMp4Pair, muxerAvailable=${muxer != null})"
+                            )
+                        }
                         false
                     }
 
                     if (!fastMuxOk && !muxSucceededWithJava) {
                         val exe = ffmpeg ?: throw IOException(
-                            "FFmpeg not found for muxing ${option.formatLabel} stream. Select an MP4 stream or install FFmpeg."
+                            "FFmpeg introuvable pour assembler le flux ${option.formatLabel}. Choisissez un flux MP4 ou installez FFmpeg."
+                        )
+                        val encodeFloor = maxProgressReached
+                        logDownload(
+                            "[$taskId] Falling back to full libx264 re-encode (floor=${(encodeFloor * 100f).toInt()}%)"
                         )
                         updateTask(taskId) {
                             it.copy(
                                 status = DownloadStatus.TRANSCODING,
-                                progress = 0.65f,
-                                statusMessage = "Encoding MP4..."
+                                progress = encodeFloor,
+                                statusMessage = "Réencodage MP4 (FFmpeg)... 0 % (peut être très long sur ce PC)"
                             )
                         }
                         runFfmpeg(
+                            taskId = taskId,
                             ffmpegExe = exe,
                             args = listOf(
                                 "-y",
@@ -578,9 +738,27 @@ class JVMDownloadController(
                                 outputFile.absolutePath
                             ),
                             durationSeconds = details.durationSeconds
-                        ) { fraction, _ ->
+                        ) { fraction, totalSize, outTimeUs ->
+                            val nextP = maxOf(
+                                maxProgressReached,
+                                (encodeFloor + (0.99f - encodeFloor) * fraction).coerceIn(encodeFloor, 0.99f)
+                            )
+                            maxProgressReached = nextP
+                            val detail = formatFfmpegProgressSuffix(
+                                fraction = fraction,
+                                durationSeconds = details.durationSeconds,
+                                outTimeUs = outTimeUs,
+                                totalSizeBytes = totalSize
+                            )
                             updateTask(taskId) {
-                                it.copy(progress = (0.65f + 0.34f * fraction).coerceIn(0.65f, 0.99f))
+                                it.copy(
+                                    progress = nextP,
+                                    statusMessage = if (detail.isNotEmpty()) {
+                                        "Réencodage MP4 (FFmpeg)... $detail (peut être très long sur ce PC)"
+                                    } else {
+                                        "Réencodage MP4 (FFmpeg)... (peut être très long sur ce PC)"
+                                    }
+                                )
                             }
                         }
                     }
@@ -588,32 +766,36 @@ class JVMDownloadController(
             }
 
             val finalSize = outputFile.takeIf { it.exists() }?.length() ?: _tasks.value.firstOrNull { it.id == taskId }?.downloadedBytes ?: 0L
+            logDownload("[$taskId] MP4 completed: size=${finalSize}B, file='${outputFile.absolutePath}'")
             updateTask(taskId) {
                 it.copy(
                     progress = 1f,
                     downloadedBytes = finalSize,
                     totalBytes = finalSize,
                     status = DownloadStatus.COMPLETED,
-                    statusMessage = "Completed"
+                    statusMessage = "Terminé"
                 )
             }
         } catch (ce: CancellationException) {
+            logDownload("[$taskId] MP4 cancelled by user")
             outputFile.delete()
-            updateTask(taskId) { it.copy(status = DownloadStatus.CANCELLED, statusMessage = "Cancelled") }
+            updateTask(taskId) { it.copy(status = DownloadStatus.CANCELLED, statusMessage = "Annulé") }
             throw ce
         } catch (t: Throwable) {
             Logger.e(t) { "MP4 download failed for ${details.title}" }
+            logDownload("[$taskId] MP4 FAILED: ${t.javaClass.simpleName}: ${t.message}")
             System.err.println("[NewPipe] MP4 download failed for ${details.title}: ${t.javaClass.simpleName}: ${t.message}")
             t.printStackTrace(System.err)
             outputFile.delete()
             updateTask(taskId) {
                 it.copy(
                     status = DownloadStatus.FAILED,
-                    statusMessage = t.message ?: "Download failed"
+                    statusMessage = t.message ?: "Échec du téléchargement"
                 )
             }
         } finally {
             tempFiles.forEach { runCatching { it.delete() } }
+            speedMarks.remove(taskId)
             jobs.remove(taskId)
         }
     }
@@ -627,9 +809,15 @@ class JVMDownloadController(
         transcodeBitrateKbps: Int? = null
     ) {
         val tempFiles = mutableListOf<File>()
+        logDownload(
+            "[$taskId] Audio start: title='${details.title}', format=${format.label}, " +
+                "src=${audioOption.formatKey}@${audioOption.bitrateKbps}kbps, " +
+                "transcodeBitrateKbps=$transcodeBitrateKbps, duration=${details.durationSeconds}s, " +
+                "out='${outputFile.absolutePath}'"
+        )
         try {
             updateTask(taskId) {
-                it.copy(status = DownloadStatus.DOWNLOADING, progress = 0.01f, statusMessage = "Downloading audio...")
+                it.copy(status = DownloadStatus.DOWNLOADING, progress = 0.01f, statusMessage = "Téléchargement audio...")
             }
             val rawTmp = tempFile("audio_raw", ".tmp").also(tempFiles::add)
             val downloadMax = if (transcodeBitrateKbps != null) 0.65f else 0.95f
@@ -638,22 +826,22 @@ class JVMDownloadController(
             }
 
             if (transcodeBitrateKbps != null) {
-                val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
-                    settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
-                ) ?: throw IOException(
-                    "FFmpeg required to convert audio to ${format.label}. Install on Windows with: winget install Gyan.FFmpeg (or configure path in Settings)."
-                )
+                val ffmpeg = findAndLogFfmpeg(taskId)
+                    ?: throw IOException(
+                        "FFmpeg requis pour convertir l'audio en ${format.label}. Installez avec : winget install Gyan.FFmpeg (ou configurez le chemin dans les Paramètres)."
+                    )
 
-                val statusLabel = when (format) {
-                    DownloadFormat.FLAC -> "Converting to FLAC (Lossless)..."
-                    DownloadFormat.WAV -> "Converting to WAV..."
-                    else -> "Converting to ${format.label} (${transcodeBitrateKbps} kbps)..."
+                val statusBase = when (format) {
+                    DownloadFormat.FLAC -> "Conversion en FLAC"
+                    DownloadFormat.WAV -> "Conversion en WAV"
+                    else -> "Conversion en ${format.label} (${transcodeBitrateKbps} kbps)"
                 }
+                var maxProgressReached = downloadMax
                 updateTask(taskId) {
                     it.copy(
                         status = DownloadStatus.TRANSCODING,
                         progress = downloadMax,
-                        statusMessage = statusLabel
+                        statusMessage = "$statusBase..."
                     )
                 }
 
@@ -676,32 +864,54 @@ class JVMDownloadController(
                     )
 
                 runFfmpeg(
+                    taskId = taskId,
                     ffmpegExe = ffmpeg,
                     args = ffmpegArgs,
                     durationSeconds = details.durationSeconds
-                ) { fraction, _ ->
+                ) { fraction, totalSize, outTimeUs ->
+                    val nextP = maxOf(
+                        maxProgressReached,
+                        (downloadMax + (0.99f - downloadMax) * fraction).coerceIn(downloadMax, 0.99f)
+                    )
+                    maxProgressReached = nextP
+                    val detail = formatFfmpegProgressSuffix(
+                        fraction = fraction,
+                        durationSeconds = details.durationSeconds,
+                        outTimeUs = outTimeUs,
+                        totalSizeBytes = totalSize
+                    )
                     updateTask(taskId) {
-                        it.copy(progress = (downloadMax + (0.99f - downloadMax) * fraction).coerceIn(downloadMax, 0.99f))
+                        it.copy(
+                            progress = nextP,
+                            statusMessage = if (detail.isNotEmpty()) "$statusBase... $detail" else "$statusBase..."
+                        )
                     }
                 }
             } else {
                 val muxer = DesktopStreamMuxerRegistry.muxer
                 if (format == DownloadFormat.OGG_OPUS && muxer != null) {
+                    logDownload("[$taskId] Demuxing Ogg/Opus from WebM via Java OggFromWebMWriter")
                     updateTask(taskId) {
-                        it.copy(status = DownloadStatus.MUXING, progress = 0.97f, statusMessage = "Packaging Ogg/Opus...")
+                        it.copy(status = DownloadStatus.MUXING, progress = 0.97f, statusMessage = "Préparation Ogg/Opus...")
                     }
                     val muxed = runCatching {
-                        muxer.demuxOggFromWebm(
-                            sourcePath = rawTmp.absolutePath,
-                            outputPath = outputFile.absolutePath,
-                            url = details.url,
-                            category = details.category,
-                            uploaderName = details.uploaderName,
-                            title = details.title,
-                            isoDate = details.isoUploadDate
-                        )
+                        runInterruptible(Dispatchers.IO) {
+                            muxer.demuxOggFromWebm(
+                                sourcePath = rawTmp.absolutePath,
+                                outputPath = outputFile.absolutePath,
+                                url = details.url,
+                                category = details.category,
+                                uploaderName = details.uploaderName,
+                                title = details.title,
+                                isoDate = details.isoUploadDate
+                            )
+                        }
                         true
-                    }.getOrElse { false }
+                    }.getOrElse { err ->
+                        if (err is CancellationException) throw err
+                        logDownload("[$taskId] Java OggFromWebMWriter fallback to .webm: ${err.javaClass.simpleName}: ${err.message}")
+                        false
+                    }
                     if (!muxed) {
                         val webmOut = uniqueOutputFile(outputFile.parentFile, outputFile.nameWithoutExtension, "webm")
                         rawTmp.copyTo(webmOut, overwrite = true)
@@ -709,46 +919,81 @@ class JVMDownloadController(
                     }
                 } else {
                     val remuxed = if (muxer != null && format == DownloadFormat.M4A) {
+                        logDownload("[$taskId] Remuxing native M4A via Java Mp4FromDashWriter")
+                        var maxRemuxProgress = 0.95f
+                        var lastJavaUiMs = 0L
+                        updateTask(taskId) {
+                            it.copy(status = DownloadStatus.MUXING, progress = 0.95f, statusMessage = "Finalisation M4A... 0 %")
+                        }
                         runCatching {
-                            muxer.remuxM4aFromDash(rawTmp.absolutePath, outputFile.absolutePath)
+                            runInterruptible(Dispatchers.IO) {
+                                muxer.remuxM4aFromDash(rawTmp.absolutePath, outputFile.absolutePath) { frac ->
+                                    val now = System.currentTimeMillis()
+                                    if (frac >= 1f || now - lastJavaUiMs >= 500L) {
+                                        lastJavaUiMs = now
+                                        val nextP = maxOf(
+                                            maxRemuxProgress,
+                                            (0.95f + 0.04f * frac).coerceIn(0.95f, 0.99f)
+                                        )
+                                        maxRemuxProgress = nextP
+                                        val pct = (frac * 100f).coerceIn(0f, 100f).toInt()
+                                        updateTask(taskId) {
+                                            it.copy(
+                                                status = DownloadStatus.MUXING,
+                                                progress = nextP,
+                                                statusMessage = "Finalisation M4A... $pct %"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             true
-                        }.getOrElse { false }
+                        }.getOrElse { err ->
+                            if (err is CancellationException) throw err
+                            logDownload("[$taskId] Java M4A remux fallback to raw copy: ${err.javaClass.simpleName}: ${err.message}")
+                            false
+                        }
                     } else {
                         false
                     }
                     if (!remuxed) {
+                        updateTask(taskId) { it.copy(statusMessage = "Finalisation...") }
                         rawTmp.copyTo(outputFile, overwrite = true)
                     }
                 }
             }
 
             val finalSize = outputFile.takeIf { it.exists() }?.length() ?: 0L
+            logDownload("[$taskId] Audio completed: size=${finalSize}B, file='${outputFile.absolutePath}'")
             updateTask(taskId) {
                 it.copy(
                     progress = 1f,
                     downloadedBytes = finalSize,
                     totalBytes = finalSize,
                     status = DownloadStatus.COMPLETED,
-                    statusMessage = "Completed"
+                    statusMessage = "Terminé"
                 )
             }
         } catch (ce: CancellationException) {
+            logDownload("[$taskId] Audio cancelled by user")
             outputFile.delete()
-            updateTask(taskId) { it.copy(status = DownloadStatus.CANCELLED, statusMessage = "Cancelled") }
+            updateTask(taskId) { it.copy(status = DownloadStatus.CANCELLED, statusMessage = "Annulé") }
             throw ce
         } catch (t: Throwable) {
             Logger.e(t) { "Audio download failed (${format.label}) for ${details.title}" }
+            logDownload("[$taskId] Audio FAILED (${format.label}): ${t.javaClass.simpleName}: ${t.message}")
             System.err.println("[NewPipe] Audio download (${format.label}) failed for ${details.title}: ${t.javaClass.simpleName}: ${t.message}")
             t.printStackTrace(System.err)
             outputFile.delete()
             updateTask(taskId) {
                 it.copy(
                     status = DownloadStatus.FAILED,
-                    statusMessage = t.message ?: "Download failed"
+                    statusMessage = t.message ?: "Échec du téléchargement"
                 )
             }
         } finally {
             tempFiles.forEach { runCatching { it.delete() } }
+            speedMarks.remove(taskId)
             jobs.remove(taskId)
         }
     }
@@ -805,7 +1050,7 @@ class JVMDownloadController(
         target: File,
         onProgress: (downloaded: Long, total: Long) -> Unit
     ) {
-        val chunkSize = 2L * 1024L * 1024L
+        val chunkSize = 8L * 1024L * 1024L
         var downloaded = if (target.exists()) target.length().coerceAtLeast(0L) else 0L
         var knownTotal = -1L
         var useRange = true
@@ -887,7 +1132,7 @@ class JVMDownloadController(
                             downloaded += read
                             bytesThisResponse += read
                             val now = System.currentTimeMillis()
-                            if (now - lastEmit >= 120L) {
+                            if (now - lastEmit >= 500L) {
                                 lastEmit = now
                                 onProgress(downloaded, knownTotal)
                             }
@@ -920,18 +1165,49 @@ class JVMDownloadController(
     }
 
     private suspend fun runFfmpeg(
+        taskId: String,
         ffmpegExe: File,
         args: List<String>,
         durationSeconds: Long = 0L,
-        onProgress: ((fraction: Float, totalSizeBytes: Long) -> Unit)? = null
+        onProgress: ((fraction: Float, totalSizeBytes: Long, outTimeUs: Long) -> Unit)? = null
     ) {
-        val command = listOf(ffmpegExe.absolutePath, "-progress", "pipe:1", "-nostats") + args
+        val command = listOf(ffmpegExe.absolutePath, "-nostdin", "-progress", "pipe:1", "-nostats") + args
+        logDownload("[$taskId] FFmpeg exe: ${ffmpegExe.absolutePath}")
+        logDownload("[$taskId] FFmpeg cmd: ${command.joinToString(" ")}")
+
+        val startedMs = System.currentTimeMillis()
         val process = ProcessBuilder(command)
-            .redirectErrorStream(true)
+            .redirectErrorStream(false)
             .start()
+        runCatching { process.outputStream.close() }
+
+        val stderrLock = Any()
+        val recentErrors = ArrayDeque<String>(40)
+        val stderrThread = Thread({
+            runCatching {
+                process.errorStream.bufferedReader().use { errReader ->
+                    while (true) {
+                        val line = errReader.readLine() ?: break
+                        if (line.isNotBlank()) {
+                            synchronized(stderrLock) {
+                                if (recentErrors.size >= 40) recentErrors.removeFirst()
+                                recentErrors.addLast(line)
+                            }
+                        }
+                    }
+                }
+            }
+        }, "ffmpeg-stderr-$taskId").apply {
+            isDaemon = true
+            start()
+        }
 
         val ctx = currentCoroutineContext()
-        val recentErrors = ArrayDeque<String>(16)
+        val cancellationHook = ctx[Job]?.invokeOnCompletion { cause ->
+            if (cause != null && process.isAlive) {
+                process.destroyForcibly()
+            }
+        }
         var latestTotalSize = 0L
         var latestOutTimeUs = 0L
         var lastEmitMs = 0L
@@ -952,33 +1228,69 @@ class JVMDownloadController(
                                 line.substringAfter('=').trim().toLongOrNull()?.let { latestOutTimeUs = it }
                             }
                         }
-                        line.startsWith("progress=") -> {
-                            val now = System.currentTimeMillis()
-                            if (onProgress != null && now - lastEmitMs >= 180L) {
-                                lastEmitMs = now
-                                val fraction = computeFfmpegProgressFraction(latestOutTimeUs, durationSeconds)
-                                onProgress(fraction, latestTotalSize)
+                        line.startsWith("out_time=") -> {
+                            if (latestOutTimeUs <= 0L) {
+                                parseFfmpegOutTimeUs(line.substringAfter('='))?.let { latestOutTimeUs = it }
                             }
                         }
-                        line.isNotBlank() && !line.contains('=') -> {
-                            if (recentErrors.size >= 12) recentErrors.removeFirst()
-                            recentErrors.addLast(line)
+                        line.startsWith("progress=") -> {
+                            val state = line.substringAfter('=').trim()
+                            val now = System.currentTimeMillis()
+                            if (onProgress != null && (state == "end" || now - lastEmitMs >= 500L)) {
+                                lastEmitMs = now
+                                val fraction = if (state == "end") {
+                                    1f
+                                } else {
+                                    computeFfmpegProgressFraction(latestOutTimeUs, durationSeconds)
+                                }
+                                onProgress(fraction, latestTotalSize, latestOutTimeUs)
+                            }
                         }
                     }
                 }
             }
             if (!ctx.isActive) {
                 process.destroyForcibly()
+                logDownload("[$taskId] FFmpeg cancelled after ${System.currentTimeMillis() - startedMs} ms")
                 throw CancellationException("FFmpeg cancelled")
             }
             val code = process.waitFor()
+            stderrThread.join(1000L)
+            val elapsedMs = System.currentTimeMillis() - startedMs
+            val errLines = synchronized(stderrLock) { recentErrors.toList() }
             if (code != 0) {
-                throw IOException("FFmpeg failed (exit $code): ${recentErrors.joinToString("\n")}")
+                logDownload("[$taskId] FFmpeg FAILED (exit=$code, elapsed=${elapsedMs}ms). Last stderr lines:")
+                errLines.forEach { logDownload("[$taskId]   stderr: $it") }
+                val summary = errLines.takeLast(8).joinToString(" | ")
+                throw IOException("FFmpeg failed (exit $code): $summary")
             }
-            onProgress?.invoke(1f, latestTotalSize)
+            logDownload("[$taskId] FFmpeg OK (exit=0, elapsed=${elapsedMs}ms, size=${latestTotalSize}B)")
+            onProgress?.invoke(1f, latestTotalSize, latestOutTimeUs)
         } catch (ce: CancellationException) {
-            process.destroyForcibly()
+            if (process.isAlive) process.destroyForcibly()
             throw ce
+        } finally {
+            cancellationHook?.dispose()
+            if (process.isAlive) {
+                process.destroyForcibly()
+            }
+            runCatching { stderrThread.join(500L) }
+        }
+    }
+
+    private fun findAndLogFfmpeg(taskId: String): File? {
+        val customPath = settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
+        val found = WindowsAppPaths.findFfmpegExecutable(customPath)
+        logDownload(
+            "[$taskId] FFmpeg lookup -> ${found?.absolutePath ?: "NOT FOUND"} " +
+                "(setting='${customPath.ifBlank { "<auto>" }}')"
+        )
+        return found
+    }
+
+    private fun logDownload(message: String) {
+        synchronized(logLock) {
+            appendLogLine(WindowsAppPaths.downloadLogFile(), message)
         }
     }
 
@@ -1050,12 +1362,112 @@ class JVMDownloadController(
             it.copy(
                 downloadedBytes = downloaded,
                 totalBytes = total.coerceAtLeast(downloaded),
-                progress = progress
+                progress = progress,
+                statusMessage = speedLabel(taskId, downloaded)
             )
         }
     }
 
+    private fun speedLabel(taskId: String, downloadedNow: Long): String {
+        val now = System.currentTimeMillis()
+        val mark = speedMarks.getOrPut(taskId) { longArrayOf(now, downloadedNow, 0L) }
+        return synchronized(mark) {
+            if (downloadedNow < mark[1]) {
+                mark[0] = now
+                mark[1] = downloadedNow
+                "Téléchargement..."
+            } else {
+                val elapsed = now - mark[0]
+                if (elapsed >= 1500L) {
+                    mark[2] = (downloadedNow - mark[1]) * 1000L / elapsed
+                    mark[0] = now
+                    mark[1] = downloadedNow
+                }
+                val speed = mark[2]
+                if (speed > 0L) "Téléchargement... " + formatSpeed(speed) else "Téléchargement..."
+            }
+        }
+    }
+
+    private fun formatSpeed(bytesPerSecond: Long): String {
+        val mo = bytesPerSecond / 1048576.0
+        return if (mo >= 1.0) {
+            String.format(Locale.FRANCE, "%.1f Mo/s", mo)
+        } else {
+            "${bytesPerSecond / 1024} Ko/s"
+        }
+    }
+
+    private fun formatMegabytes(bytes: Long): String {
+        val mo = bytes / 1048576.0
+        return if (mo >= 1.0) {
+            String.format(Locale.FRANCE, "%.1f Mo", mo)
+        } else {
+            "${bytes / 1024L} Ko"
+        }
+    }
+
+    private fun formatElapsedSeconds(totalSec: Long): String {
+        val s = totalSec.coerceAtLeast(0L)
+        val hours = s / 3600L
+        val minutes = (s % 3600L) / 60L
+        val secs = s % 60L
+        return if (hours > 0L) {
+            String.format(Locale.ROOT, "%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            String.format(Locale.ROOT, "%02d:%02d", minutes, secs)
+        }
+    }
+
+    private fun formatFfmpegProgressSuffix(
+        fraction: Float,
+        durationSeconds: Long,
+        outTimeUs: Long,
+        totalSizeBytes: Long
+    ): String {
+        val parts = mutableListOf<String>()
+        if (durationSeconds > 0L) {
+            parts += "${(fraction * 100f).coerceIn(0f, 100f).toInt()} %"
+        } else if (outTimeUs > 0L) {
+            parts += formatElapsedSeconds(outTimeUs / 1_000_000L)
+        }
+        if (totalSizeBytes > 0L) {
+            parts += formatMegabytes(totalSizeBytes)
+        }
+        return parts.joinToString(" • ")
+    }
+
     companion object {
+        private val LOG_TIME_FORMATTER: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+        private const val MAX_LOG_SIZE_BYTES = 2L * 1024L * 1024L
+
+        internal fun appendLogLine(logFile: File, message: String) {
+            runCatching {
+                logFile.parentFile?.mkdirs()
+                if (logFile.exists() && logFile.length() > MAX_LOG_SIZE_BYTES) {
+                    val backup = File(logFile.parentFile, "${logFile.name}.old")
+                    if (backup.exists()) backup.delete()
+                    logFile.renameTo(backup)
+                }
+                val timestamp = LocalDateTime.now().format(LOG_TIME_FORMATTER)
+                logFile.appendText("[$timestamp] $message\n", Charsets.UTF_8)
+            }
+        }
+
+        internal fun parseFfmpegOutTimeUs(value: String): Long? {
+            val trimmed = value.trim()
+            if (trimmed.isEmpty() || trimmed.equals("N/A", ignoreCase = true)) return null
+            val parts = trimmed.split(':')
+            if (parts.size != 3) return null
+            val hours = parts[0].toLongOrNull() ?: return null
+            val minutes = parts[1].toLongOrNull() ?: return null
+            val seconds = parts[2].toDoubleOrNull() ?: return null
+            val totalSeconds = hours * 3600.0 + minutes * 60.0 + seconds
+            if (totalSeconds < 0.0) return null
+            return (totalSeconds * 1_000_000.0).toLong()
+        }
+
         internal fun resolveTargetDirectoryForOpen(
             path: String,
             fallbackDir: File = WindowsAppPaths.defaultVideoDownloadDir()

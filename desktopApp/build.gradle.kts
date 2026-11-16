@@ -18,6 +18,8 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.jetbrains.coroutines.swing)
     implementation(libs.jetbrains.compose.preview)
+
+    testImplementation(kotlin("test-junit"))
 }
 
 compose.desktop {

@@ -9,6 +9,8 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class JVMDownloadControllerTest {
 
@@ -50,5 +52,37 @@ class JVMDownloadControllerTest {
         assertEquals(0f, JVMDownloadController.computeFfmpegProgressFraction(10_000_000L, 0L))
         assertEquals(0.5f, JVMDownloadController.computeFfmpegProgressFraction(60_000_000L, 120L), 0.001f)
         assertEquals(1f, JVMDownloadController.computeFfmpegProgressFraction(200_000_000L, 120L), 0.001f)
+    }
+
+    @Test
+    fun parseFfmpegOutTimeUsHandlesTimestampsAndNA() {
+        assertNull(JVMDownloadController.parseFfmpegOutTimeUs("N/A"))
+        assertNull(JVMDownloadController.parseFfmpegOutTimeUs("invalid"))
+        assertEquals(
+            3_723_500_000L,
+            JVMDownloadController.parseFfmpegOutTimeUs("01:02:03.500000")
+        )
+        assertEquals(
+            90_000_000L,
+            JVMDownloadController.parseFfmpegOutTimeUs("00:01:30.000000")
+        )
+    }
+
+    @Test
+    fun appendLogLineCreatesLogFileInTargetDirectory() {
+        val tempRoot = createTempDirectory("np_log_test").toFile()
+        try {
+            val logFile = File(tempRoot, "NewPipeDesktop/download_mux.log")
+            JVMDownloadController.appendLogLine(logFile, "FFmpeg lookup -> C:\\ffmpeg\\bin\\ffmpeg.exe")
+            JVMDownloadController.appendLogLine(logFile, "FFmpeg FAILED (exit=1)")
+
+            assertTrue(logFile.exists())
+            val content = logFile.readText(Charsets.UTF_8)
+            assertTrue(content.contains("FFmpeg lookup ->"))
+            assertTrue(content.contains("FFmpeg FAILED (exit=1)"))
+            assertEquals("download_mux.log", WindowsAppPaths.downloadLogFile().name)
+        } finally {
+            tempRoot.deleteRecursively()
+        }
     }
 }
