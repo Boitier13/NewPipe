@@ -52,7 +52,7 @@ private data class NewPipeSubscriptionExportData(
 )
 
 @Serializable
-private data class NewPipeSubscriptionExportItem(
+internal data class NewPipeSubscriptionExportItem(
     @SerialName("service_id")
     val serviceId: Int = 0,
     val url: String,
