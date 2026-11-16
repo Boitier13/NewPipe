@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import net.newpipe.app.model.AudioStreamOption
 import net.newpipe.app.model.ChannelSummary
+import net.newpipe.app.model.DownloadFormat
 import net.newpipe.app.model.PlayerState
 import net.newpipe.app.model.VideoDetails
 import net.newpipe.app.model.VideoStreamOption
@@ -161,5 +162,14 @@ class VideoDetailViewModel(
     fun downloadNativeAudio(option: AudioStreamOption, targetBitrateKbps: Int? = null) {
         val details = _uiState.value.details ?: return
         downloadController.enqueueNativeAudio(details, option, targetBitrateKbps)
+    }
+
+    fun downloadAudio(
+        option: AudioStreamOption,
+        format: DownloadFormat,
+        targetBitrateKbps: Int? = null
+    ) {
+        val details = _uiState.value.details ?: return
+        downloadController.enqueueAudio(details, option, format, targetBitrateKbps)
     }
 }

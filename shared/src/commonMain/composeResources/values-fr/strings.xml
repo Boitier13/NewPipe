@@ -114,4 +114,12 @@
     <string name="desktop_background_audio_active">Lecture audio en arrière-plan active</string>
     <string name="desktop_view_downloads">Voir</string>
     <string name="desktop_active_downloads">Téléchargement</string>
+    <string name="desktop_audio_format">Format</string>
+    <string name="desktop_audio_original">Flux original (sans ré-encodage)</string>
+    <string name="desktop_audio_lossless">Sans perte / Non compressé (FFmpeg)</string>
+    <string name="desktop_import_subscriptions">Importer YouTube (CSV / JSON)</string>
+    <string name="desktop_import_subscriptions_title">Importer vos abonnements YouTube</string>
+    <string name="desktop_import_subscriptions_desc">Pour protéger votre vie privée et la sécurité de votre compte, NewPipe ne se connecte pas directement à Google. Pour retrouver vos abonnements YouTube ici :\n\n1. Ouvrez takeout.google.com et exportez YouTube → abonnements (subscriptions.csv), ou utilisez un fichier NewPipe subscriptions.json.\n2. Cliquez sur Choisir un fichier ci-dessous pour importer toutes vos chaînes localement.</string>
+    <string name="desktop_choose_file">Choisir un fichier…</string>
+    <string name="desktop_import_subscriptions_success">%1$d abonnement(s) importé(s).</string>
 </resources>

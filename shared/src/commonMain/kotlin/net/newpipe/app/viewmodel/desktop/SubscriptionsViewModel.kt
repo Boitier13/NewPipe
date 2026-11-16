@@ -26,7 +26,9 @@ import org.koin.core.annotation.KoinViewModel
 data class SubscriptionsFeedState(
     val feedVideos: List<StreamSummary> = emptyList(),
     val isRefreshing: Boolean = false,
-    val statusMessage: String? = null
+    val statusMessage: String? = null,
+    val importCount: Int? = null,
+    val importError: String? = null
 )
 
 @KoinViewModel
@@ -45,6 +47,25 @@ class SubscriptionsViewModel(
         viewModelScope.launch {
             database.unsubscribe(record.serviceId, record.url)
         }
+    }
+
+    fun importSubscriptionsFile(filePath: String) {
+        viewModelScope.launch {
+            _feedState.update { it.copy(importCount = null, importError = null) }
+            database.importSubscriptionsJson(filePath)
+                .onSuccess { count ->
+                    _feedState.update { it.copy(importCount = count, importError = null) }
+                }
+                .onFailure { err ->
+                    _feedState.update {
+                        it.copy(importCount = null, importError = err.message ?: "Import failed")
+                    }
+                }
+        }
+    }
+
+    fun clearImportStatus() {
+        _feedState.update { it.copy(importCount = null, importError = null) }
     }
 
     fun refreshFeed() {

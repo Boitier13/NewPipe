@@ -495,12 +495,18 @@ class JVMDesktopDatabase(
     override suspend fun importSubscriptionsJson(filePath: String): Result<Int> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val rawJson = File(filePath).readText(Charsets.UTF_8)
-                val decoded = json.decodeFromString(NewPipeSubscriptionExportData.serializer(), rawJson)
+                val raw = File(filePath).readText(Charsets.UTF_8).trimStart('\uFEFF')
+                val entries: List<NewPipeSubscriptionExportItem> =
+                    if (filePath.endsWith(".csv", ignoreCase = true) || !raw.trimStart().startsWith("{")) {
+                        parseTakeoutCsvSubscriptions(raw)
+                    } else {
+                        json.decodeFromString(NewPipeSubscriptionExportData.serializer(), raw).subscriptions
+                    }
+
                 var count = 0
                 mutex.withLock {
                     val conn = ensureOpenLocked()
-                    for (item in decoded.subscriptions) {
+                    for (item in entries) {
                         if (item.url.isBlank()) continue
                         conn.prepare(
                             """
@@ -839,4 +845,68 @@ class JVMDesktopDatabase(
 
     private fun SQLiteStatement.getNullableLong(index: Int): Long? =
         if (isNull(index)) null else getLong(index)
+
+    companion object {
+        internal fun parseTakeoutCsvSubscriptions(csvText: String): List<NewPipeSubscriptionExportItem> {
+            val result = mutableListOf<NewPipeSubscriptionExportItem>()
+            for (rawLine in csvText.lineSequence()) {
+                val line = rawLine.trim()
+                if (line.isEmpty()) continue
+                val cols = parseCsvRow(line)
+                if (cols.size < 2) continue
+
+                val col0 = cols[0].trim()
+                val col1 = cols.getOrNull(1)?.trim().orEmpty()
+                val col2 = cols.getOrNull(2)?.trim().orEmpty()
+
+                val rawUrl = when {
+                    col1.contains("youtube.com/", ignoreCase = true) -> col1
+                    col0.contains("youtube.com/", ignoreCase = true) -> col0
+                    col0.startsWith("UC") && col0.length >= 20 -> "https://www.youtube.com/channel/$col0"
+                    else -> ""
+                }
+                if (rawUrl.isBlank()) continue
+
+                val normalizedUrl = rawUrl.replaceFirst("http://", "https://", ignoreCase = true)
+                val title = col2.ifBlank {
+                    col1.takeIf { it != rawUrl && it.isNotBlank() }
+                        ?: col0.ifBlank { normalizedUrl }
+                }
+                result += NewPipeSubscriptionExportItem(
+                    serviceId = 0,
+                    url = normalizedUrl,
+                    name = title
+                )
+            }
+            return result
+        }
+
+        private fun parseCsvRow(line: String): List<String> {
+            val fields = mutableListOf<String>()
+            val current = StringBuilder()
+            var inQuotes = false
+            var i = 0
+            while (i < line.length) {
+                val ch = line[i]
+                when {
+                    ch == '"' -> {
+                        if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+                            current.append('"')
+                            i++
+                        } else {
+                            inQuotes = !inQuotes
+                        }
+                    }
+                    ch == ',' && !inQuotes -> {
+                        fields += current.toString()
+                        current.setLength(0)
+                    }
+                    else -> current.append(ch)
+                }
+                i++
+            }
+            fields += current.toString()
+            return fields
+        }
+    }
 }

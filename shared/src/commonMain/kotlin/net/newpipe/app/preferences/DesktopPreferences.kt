@@ -32,5 +32,5 @@ object DesktopPreferences {
     val TARGET_VIDEO_HEIGHTS = listOf(1080, 720, 480, 360, 144)
     val DATA_SAVER_RESOLUTION_OPTIONS = listOf("480p", "360p", "240p", "144p")
     val MP3_BITRATE_OPTIONS = listOf("96k", "128k", "192k", "320k")
-    val AUDIO_DOWNLOAD_BITRATES_KBPS = listOf(96, 128, 320)
+    val AUDIO_DOWNLOAD_BITRATES_KBPS = listOf(96, 128, 192, 320)
 }

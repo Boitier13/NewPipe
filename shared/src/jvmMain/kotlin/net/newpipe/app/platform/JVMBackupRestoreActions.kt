@@ -46,7 +46,7 @@ class JVMBackupRestoreActions(
                         BackupFile.DATA_EXPORT -> "Export NewPipe Backup"
                         BackupFile.DATA_IMPORT -> "Import NewPipe Backup"
                         BackupFile.SUBSCRIPTIONS_EXPORT -> "Export Subscriptions JSON"
-                        BackupFile.SUBSCRIPTIONS_IMPORT -> "Import Subscriptions JSON"
+                        BackupFile.SUBSCRIPTIONS_IMPORT -> "Import Subscriptions (CSV / JSON)"
                     }
                     val dialog = FileDialog(
                         null as Frame?,
@@ -57,7 +57,13 @@ class JVMBackupRestoreActions(
                         if (isSave) {
                             this.file = if (ext == "zip") "newpipe_backup.zip" else "newpipe_subscriptions.json"
                         }
-                        setFilenameFilter { _, name -> name.endsWith(".$ext", ignoreCase = true) }
+                        setFilenameFilter { _, name ->
+                            if (file == BackupFile.SUBSCRIPTIONS_IMPORT) {
+                                name.endsWith(".json", ignoreCase = true) || name.endsWith(".csv", ignoreCase = true)
+                            } else {
+                                name.endsWith(".$ext", ignoreCase = true)
+                            }
+                        }
                         isVisible = true
                     }
                     val chosenDir = dialog.directory

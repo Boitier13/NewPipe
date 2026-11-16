@@ -26,6 +26,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,12 +35,16 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,15 +56,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import net.newpipe.app.model.BackupFile
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
+import net.newpipe.app.platform.BackupRestoreActions
 import net.newpipe.app.viewmodel.desktop.SubscriptionsViewModel
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.cancel
+import newpipe.shared.generated.resources.desktop_choose_file
 import newpipe.shared.generated.resources.desktop_feed_tab
+import newpipe.shared.generated.resources.desktop_import_subscriptions
+import newpipe.shared.generated.resources.desktop_import_subscriptions_desc
+import newpipe.shared.generated.resources.desktop_import_subscriptions_success
+import newpipe.shared.generated.resources.desktop_import_subscriptions_title
 import newpipe.shared.generated.resources.desktop_nav_subscriptions
 import newpipe.shared.generated.resources.desktop_no_subscriptions
 import newpipe.shared.generated.resources.desktop_refresh_feed
 import newpipe.shared.generated.resources.desktop_subscriptions_tab
+import newpipe.shared.generated.resources.ic_close
 import newpipe.shared.generated.resources.ic_delete
 import newpipe.shared.generated.resources.ic_refresh
 import org.jetbrains.compose.resources.painterResource
@@ -69,16 +84,28 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SubscriptionsScreen(
     viewModel: SubscriptionsViewModel = koinViewModel(),
-    navigator: Navigator = koinInject()
+    navigator: Navigator = koinInject(),
+    backupRestoreActions: BackupRestoreActions = koinInject()
 ) {
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
     val feedState by viewModel.feedState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showImportDialog by remember { mutableStateOf(false) }
+
+    val pickSubscriptionsFile = backupRestoreActions.rememberFilePicker(
+        file = BackupFile.SUBSCRIPTIONS_IMPORT,
+        onNoFileManager = {},
+        onPicked = { path ->
+            showImportDialog = false
+            viewModel.importSubscriptionsFile(path)
+        }
+    )
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = stringResource(Res.string.desktop_nav_subscriptions),
@@ -86,6 +113,9 @@ fun SubscriptionsScreen(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
+            OutlinedButton(onClick = { showImportDialog = true }) {
+                Text(stringResource(Res.string.desktop_import_subscriptions))
+            }
             if (selectedTab == 1) {
                 FilledTonalButton(
                     enabled = !feedState.isRefreshing,
@@ -94,6 +124,45 @@ fun SubscriptionsScreen(
                     Icon(painterResource(Res.drawable.ic_refresh), null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(Res.string.desktop_refresh_feed))
+                }
+            }
+        }
+
+        val statusText = when {
+            feedState.importCount != null -> stringResource(
+                Res.string.desktop_import_subscriptions_success,
+                feedState.importCount ?: 0
+            )
+            feedState.importError != null -> feedState.importError
+            else -> null
+        }
+        if (statusText != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                color = if (feedState.importError != null) {
+                    MaterialTheme.colorScheme.errorContainer
+                } else {
+                    MaterialTheme.colorScheme.secondaryContainer
+                },
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = viewModel::clearImportStatus, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_close),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -122,10 +191,18 @@ fun SubscriptionsScreen(
 
         if (subscriptions.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = stringResource(Res.string.desktop_no_subscriptions),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(Res.string.desktop_no_subscriptions),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    FilledTonalButton(onClick = { showImportDialog = true }) {
+                        Text(stringResource(Res.string.desktop_import_subscriptions))
+                    }
+                }
             }
         } else if (selectedTab == 0) {
             LazyColumn(
@@ -226,5 +303,23 @@ fun SubscriptionsScreen(
                 }
             }
         }
+    }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = { Text(stringResource(Res.string.desktop_import_subscriptions_title)) },
+            text = { Text(stringResource(Res.string.desktop_import_subscriptions_desc)) },
+            confirmButton = {
+                Button(onClick = pickSubscriptionsFile) {
+                    Text(stringResource(Res.string.desktop_choose_file))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            }
+        )
     }
 }

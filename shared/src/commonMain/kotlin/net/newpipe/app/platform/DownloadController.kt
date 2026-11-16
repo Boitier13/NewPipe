@@ -8,6 +8,7 @@ package net.newpipe.app.platform
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.flow.StateFlow
 import net.newpipe.app.model.AudioStreamOption
+import net.newpipe.app.model.DownloadFormat
 import net.newpipe.app.model.DownloadTaskItem
 import net.newpipe.app.model.VideoDetails
 import net.newpipe.app.model.VideoStreamOption
@@ -59,6 +60,18 @@ interface DownloadController {
         audioOption: AudioStreamOption,
         targetBitrateKbps: Int? = null
     )
+
+    fun enqueueAudio(
+        details: VideoDetails,
+        audioOption: AudioStreamOption,
+        format: DownloadFormat,
+        targetBitrateKbps: Int? = null
+    ) {
+        when (format) {
+            DownloadFormat.MP3 -> enqueueMp3(details, audioOption, targetBitrateKbps)
+            else -> enqueueNativeAudio(details, audioOption, targetBitrateKbps)
+        }
+    }
 
     fun cancelTask(taskId: String)
 

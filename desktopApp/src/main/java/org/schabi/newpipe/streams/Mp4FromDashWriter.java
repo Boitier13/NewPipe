@@ -24,8 +24,8 @@ public class Mp4FromDashWriter {
     private static final byte SAMPLES_PER_CHUNK = 6;
     // near 3.999 GiB
     private static final long THRESHOLD_FOR_CO64 = 0xFFFEFFFFL;
-    // 2.2 MiB enough for: 1080p 60fps 00h35m00s
-    private static final int THRESHOLD_MOOV_LENGTH = (256 * 1024) + (2048 * 1024);
+    // 32 MiB enough to keep long videos (several hours) in memory instead of random disk seeks
+    private static final int THRESHOLD_MOOV_LENGTH = 32 * 1024 * 1024;
 
     private final long time;
 

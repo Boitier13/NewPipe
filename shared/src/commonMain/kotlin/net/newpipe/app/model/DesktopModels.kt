@@ -156,7 +156,9 @@ enum class DownloadFormat(val extension: String, val label: String) {
     MP4("mp4", "MP4"),
     MP3("mp3", "MP3"),
     M4A("m4a", "M4A"),
-    OGG_OPUS("ogg", "OGG/Opus")
+    OGG_OPUS("ogg", "OGG/Opus"),
+    FLAC("flac", "FLAC"),
+    WAV("wav", "WAV")
 }
 
 enum class DownloadStatus {
