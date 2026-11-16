@@ -39,15 +39,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import kotlin.math.roundToInt
 import net.newpipe.app.model.ChannelSummary
+import net.newpipe.app.model.DownloadTaskItem
 import net.newpipe.app.model.PlayerPlaybackMode
 import net.newpipe.app.model.PlayerState
 import net.newpipe.app.model.PlaylistSummary
 import net.newpipe.app.model.StreamSummary
 import net.newpipe.app.platform.MediaPlayerController
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.desktop_active_downloads
 import newpipe.shared.generated.resources.desktop_background_audio_active
 import newpipe.shared.generated.resources.desktop_switch_to_video
+import newpipe.shared.generated.resources.desktop_view_downloads
+import newpipe.shared.generated.resources.ic_file_download
 import newpipe.shared.generated.resources.ic_forward_10
 import newpipe.shared.generated.resources.ic_headset
 import newpipe.shared.generated.resources.ic_movie
@@ -399,6 +404,79 @@ fun MiniPlayerBar(
                         painter = painterResource(Res.drawable.ic_stop),
                         contentDescription = "Stop"
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActiveDownloadBanner(
+    activeTasks: List<DownloadTaskItem>,
+    onOpenDownloads: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val primary = activeTasks.firstOrNull() ?: return
+    val pct = (primary.progress.coerceIn(0f, 1f) * 100f).roundToInt()
+
+    Surface(
+        tonalElevation = 4.dp,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = modifier.fillMaxWidth().clickable(onClick = onOpenDownloads)
+    ) {
+        Column {
+            val barModifier = Modifier.fillMaxWidth().height(4.dp)
+            if (primary.progress > 0f) {
+                LinearProgressIndicator(
+                    progress = { primary.progress.coerceIn(0f, 1f) },
+                    modifier = barModifier
+                )
+            } else {
+                LinearProgressIndicator(modifier = barModifier)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_file_download),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(18.dp)
+                )
+                val countPrefix = if (activeTasks.size > 1) "${activeTasks.size}× " else ""
+                Text(
+                    text = "$countPrefix${stringResource(Res.string.desktop_active_downloads)}: ${primary.title}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                val progressDetail = buildString {
+                    if (primary.progress > 0f) append("$pct%")
+                    if (primary.downloadedBytes > 0L) {
+                        if (isNotEmpty()) append(" • ")
+                        append(formatBytes(primary.downloadedBytes))
+                        if (primary.totalBytes > primary.downloadedBytes) {
+                            append(" / ${formatBytes(primary.totalBytes)}")
+                        }
+                    }
+                }
+                if (progressDetail.isNotEmpty()) {
+                    Text(
+                        text = progressDetail,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+                TextButton(onClick = onOpenDownloads) {
+                    Text(stringResource(Res.string.desktop_view_downloads))
                 }
             }
         }
