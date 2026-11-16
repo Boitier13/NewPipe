@@ -160,7 +160,7 @@ object WindowsAppPaths {
         }
         return candidates
             .filter { it.exists() && it.isDirectory }
-            .distinctBy { runCatching { it.canonicalPath }.getOrElse { it.absolutePath } }
+            .distinctBy { dir -> runCatching { dir.canonicalPath }.getOrElse { dir.absolutePath } }
     }
 
     @JvmOverloads
