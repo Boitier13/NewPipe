@@ -47,6 +47,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -105,6 +106,7 @@ import newpipe.shared.generated.resources.desktop_speed
 import newpipe.shared.generated.resources.desktop_subscribe
 import newpipe.shared.generated.resources.desktop_subscribed
 import newpipe.shared.generated.resources.desktop_switch_to_video
+import newpipe.shared.generated.resources.desktop_view_downloads
 import newpipe.shared.generated.resources.ic_add
 import newpipe.shared.generated.resources.ic_arrow_back
 import newpipe.shared.generated.resources.ic_check
@@ -364,7 +366,7 @@ fun VideoDetailScreen(
                                 }
                             }
 
-                            // Non-overlapping controls bar BELOW SwingPanel so Windows HWND never occludes Compose UI
+                            // Controls bar placed directly below the video viewport
                             DesktopPlayerControlsBar(
                                 details = details,
                                 playerState = playerState,
@@ -587,6 +589,7 @@ fun VideoDetailScreen(
                     }
 
                     if (showDownloadDialog) {
+                        val viewLabel = stringResource(Res.string.desktop_view_downloads)
                         DownloadMediaDialog(
                             details = details,
                             ffmpegAvailable = viewModel.isFfmpegAvailable(),
@@ -594,14 +597,26 @@ fun VideoDetailScreen(
                                 viewModel.downloadMp4(option)
                                 showDownloadDialog = false
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("MP4 download started (${option.resolution})")
+                                    val res = snackbarHostState.showSnackbar(
+                                        message = "MP4 download started (${option.resolution})",
+                                        actionLabel = viewLabel
+                                    )
+                                    if (res == SnackbarResult.ActionPerformed) {
+                                        navigator.navigateRoot(Destination.Downloads)
+                                    }
                                 }
                             },
                             onDownloadMp3 = { option, bitrateKbps ->
                                 viewModel.downloadMp3(option, bitrateKbps)
                                 showDownloadDialog = false
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("MP3 download started (${bitrateKbps} kbps)")
+                                    val res = snackbarHostState.showSnackbar(
+                                        message = "MP3 download started (${bitrateKbps} kbps)",
+                                        actionLabel = viewLabel
+                                    )
+                                    if (res == SnackbarResult.ActionPerformed) {
+                                        navigator.navigateRoot(Destination.Downloads)
+                                    }
                                 }
                             },
                             onDownloadNativeAudio = { option, bitrateKbps ->
@@ -610,7 +625,13 @@ fun VideoDetailScreen(
                                 val msg = bitrateKbps?.let { "Audio download started (${it} kbps)" }
                                     ?: "Audio download started"
                                 scope.launch {
-                                    snackbarHostState.showSnackbar(msg)
+                                    val res = snackbarHostState.showSnackbar(
+                                        message = msg,
+                                        actionLabel = viewLabel
+                                    )
+                                    if (res == SnackbarResult.ActionPerformed) {
+                                        navigator.navigateRoot(Destination.Downloads)
+                                    }
                                 }
                             },
                             onDismiss = { showDownloadDialog = false }

@@ -402,5 +402,7 @@
     <string name="desktop_no_subscriptions">No subscriptions yet. Open a channel or video to subscribe locally without an account.</string>
     <string name="desktop_no_history">No history recorded yet.</string>
     <string name="desktop_background_audio_active">Background audio playback active</string>
+    <string name="desktop_view_downloads">View</string>
+    <string name="desktop_active_downloads">Downloading</string>
 
 </resources>

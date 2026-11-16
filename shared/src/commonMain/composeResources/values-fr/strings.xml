@@ -112,4 +112,6 @@
     <string name="desktop_no_subscriptions">Aucun abonnement pour le moment. Abonnez-vous localement sans compte Google.</string>
     <string name="desktop_no_history">Aucun historique enregistré.</string>
     <string name="desktop_background_audio_active">Lecture audio en arrière-plan active</string>
+    <string name="desktop_view_downloads">Voir</string>
+    <string name="desktop_active_downloads">Téléchargement</string>
 </resources>

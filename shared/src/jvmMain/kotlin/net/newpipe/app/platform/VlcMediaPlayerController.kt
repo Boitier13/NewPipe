@@ -5,24 +5,33 @@
 
 package net.newpipe.app.platform
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asComposeImageBitmap
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import co.touchlab.kermit.Logger
 import com.russhwolf.settings.Settings
 import java.io.File
+import java.nio.ByteBuffer
+import java.util.ArrayDeque
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import javax.swing.SwingUtilities
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,16 +48,28 @@ import net.newpipe.app.model.VideoStreamOption
 import net.newpipe.app.preferences.DesktopPreferences
 import net.newpipe.app.preferences.HistoryPreferences
 import net.newpipe.app.preferences.VideoAudioPreferences
+import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
+import org.jetbrains.skia.ImageInfo
 import org.koin.core.annotation.Singleton
 import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.component.AudioPlayerComponent
-import uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent
+import uk.co.caprica.vlcj.player.component.CallbackMediaPlayerComponent
+import uk.co.caprica.vlcj.player.component.InputEvents
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormat
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormatCallbackAdapter
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.RenderCallback
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32BufferFormat
 
 /**
- * Desktop media controller powered by VLC / VLCJ (`libVLC`), supporting embedded video
- * playback via SwingPanel and background audio playback without a visible video window.
+ * Desktop media controller powered by VLC / VLCJ (`libVLC`).
+ *
+ * Uses [CallbackMediaPlayerComponent] to decode frames into Skia [ImageBitmap]s rendered
+ * directly on a Compose [Canvas] — avoiding native AWT/HWND surfaces so fullscreen toggles,
+ * scrolling, dialogs, and MiniPlayer round-trips never turn the viewport black.
  */
 @Singleton(binds = [MediaPlayerController::class])
 class VlcMediaPlayerController(
@@ -56,6 +77,14 @@ class VlcMediaPlayerController(
     private val dataSaverController: DataSaverController,
     private val database: DesktopDatabaseGateway
 ) : MediaPlayerController {
+
+    private data class VideoFrame(
+        val skiaBitmap: Bitmap,
+        val imageBitmap: ImageBitmap,
+        val width: Int,
+        val height: Int,
+        val sequence: Long
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val vlcExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -70,8 +99,14 @@ class VlcMediaPlayerController(
     )
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
 
+    private val _currentFrame = MutableStateFlow<VideoFrame?>(null)
+    private val frameLock = Any()
+    private var reusableFrameBytes = ByteArray(0)
+    private var frameSequence = 0L
+    private val retiringBitmaps = ArrayDeque<Bitmap>()
+
     @Volatile
-    private var videoComponent: EmbeddedMediaPlayerComponent? = null
+    private var videoComponent: CallbackMediaPlayerComponent? = null
 
     @Volatile
     private var audioComponent: AudioPlayerComponent? = null
@@ -86,6 +121,83 @@ class VlcMediaPlayerController(
     private var lastSavedProgressTimestamp = 0L
 
     private val discoveryAttempted = AtomicBoolean(false)
+    private val playbackTransitioning = AtomicBoolean(false)
+    private val playbackGeneration = AtomicLong(0L)
+
+    private val bufferFormatCallback = object : BufferFormatCallbackAdapter() {
+        override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
+            val w = sourceWidth.coerceAtLeast(1)
+            val h = sourceHeight.coerceAtLeast(1)
+            return RV32BufferFormat(w, h)
+        }
+    }
+
+    private val renderCallback = RenderCallback { _, nativeBuffers, bufferFormat ->
+        val width = bufferFormat.width
+        val height = bufferFormat.height
+        if (width <= 0 || height <= 0 || nativeBuffers.isEmpty()) return@RenderCallback
+        val srcBuffer: ByteBuffer = nativeBuffers[0]
+        val expectedBytes = width * height * 4
+        if (srcBuffer.capacity() < expectedBytes) return@RenderCallback
+
+        synchronized(frameLock) {
+            if (reusableFrameBytes.size != expectedBytes) {
+                reusableFrameBytes = ByteArray(expectedBytes)
+            }
+            val dup = srcBuffer.duplicate()
+            dup.rewind()
+            if (dup.remaining() < expectedBytes) return@RenderCallback
+            dup.get(reusableFrameBytes, 0, expectedBytes)
+
+            val bitmap = Bitmap()
+            val imageInfo = ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)
+            val installed = bitmap.installPixels(imageInfo, reusableFrameBytes, width * 4)
+            if (!installed) {
+                bitmap.close()
+                return@RenderCallback
+            }
+            bitmap.setImmutable()
+            val imageBitmap = bitmap.asComposeImageBitmap()
+
+            val previous = _currentFrame.value
+            _currentFrame.value = VideoFrame(
+                skiaBitmap = bitmap,
+                imageBitmap = imageBitmap,
+                width = width,
+                height = height,
+                sequence = ++frameSequence
+            )
+            if (previous != null) {
+                retiringBitmaps.addLast(previous.skiaBitmap)
+                while (retiringBitmaps.size > 6) {
+                    val oldest = retiringBitmaps.removeFirst()
+                    SwingUtilities.invokeLater {
+                        if (!oldest.isClosed) {
+                            runCatching { oldest.close() }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun clearVideoFrames() {
+        synchronized(frameLock) {
+            val prev = _currentFrame.value
+            _currentFrame.value = null
+            if (prev != null) {
+                retiringBitmaps.addLast(prev.skiaBitmap)
+            }
+            while (retiringBitmaps.size > 6) {
+                val oldest = retiringBitmaps.removeFirst()
+                SwingUtilities.invokeLater {
+                    if (!oldest.isClosed) {
+                        runCatching { oldest.close() }
+                    }
+                }
+            }
+        }
+    }
 
     override fun recheckVlcAvailability(): Boolean {
         discoveryAttempted.set(false)
@@ -118,40 +230,33 @@ class VlcMediaPlayerController(
         return _state.value.vlcAvailable
     }
 
-    private fun getOrCreateVideoSurface(): EmbeddedMediaPlayerComponent? {
+    private fun getOrCreateVideoPlayer(): CallbackMediaPlayerComponent? {
         if (!ensureVlcDiscovered()) return null
         videoComponent?.let { return it }
 
-        val createOnEdt: () -> EmbeddedMediaPlayerComponent? = {
-            synchronized(videoLock) {
-                videoComponent ?: runCatching {
-                    val comp = EmbeddedMediaPlayerComponent()
-                    comp.background = java.awt.Color.BLACK
-                    attachListeners(comp.mediaPlayer(), PlayerPlaybackMode.VIDEO)
-                    videoComponent = comp
-                    comp
-                }.onFailure { err ->
-                    Logger.e(err) { "Failed to initialize VLC EmbeddedMediaPlayerComponent" }
-                    _state.update {
-                        it.copy(
-                            vlcAvailable = false,
-                            errorMessage = err.message ?: missingVlcMessage()
-                        )
-                    }
-                }.getOrNull()
-            }
-        }
-
-        return if (SwingUtilities.isEventDispatchThread()) {
-            createOnEdt()
-        } else {
-            var holder: EmbeddedMediaPlayerComponent? = null
-            runCatching {
-                SwingUtilities.invokeAndWait { holder = createOnEdt() }
+        return synchronized(videoLock) {
+            videoComponent ?: runCatching {
+                val comp = CallbackMediaPlayerComponent(
+                    null,
+                    null,
+                    InputEvents.NONE,
+                    false,
+                    renderCallback,
+                    bufferFormatCallback,
+                    null
+                )
+                attachListeners(comp.mediaPlayer(), PlayerPlaybackMode.VIDEO)
+                videoComponent = comp
+                comp
             }.onFailure { err ->
-                Logger.e(err) { "Failed dispatching VLC surface creation to EDT" }
-            }
-            holder
+                Logger.e(err) { "Failed to initialize VLC CallbackMediaPlayerComponent" }
+                _state.update {
+                    it.copy(
+                        vlcAvailable = false,
+                        errorMessage = err.message ?: missingVlcMessage()
+                    )
+                }
+            }.getOrNull()
         }
     }
 
@@ -179,12 +284,13 @@ class VlcMediaPlayerController(
     private fun attachListeners(mediaPlayer: MediaPlayer, componentMode: PlayerPlaybackMode) {
         mediaPlayer.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun buffering(mp: MediaPlayer, newCache: Float) {
-                if (_state.value.mode == componentMode) {
+                if (_state.value.mode == componentMode && !playbackTransitioning.get()) {
                     _state.update { it.copy(isBuffering = newCache < 100f) }
                 }
             }
 
             override fun playing(mp: MediaPlayer) {
+                playbackTransitioning.set(false)
                 if (_state.value.mode == componentMode) {
                     _state.update {
                         it.copy(
@@ -205,20 +311,20 @@ class VlcMediaPlayerController(
             }
 
             override fun paused(mp: MediaPlayer) {
-                if (_state.value.mode == componentMode) {
+                if (_state.value.mode == componentMode && !playbackTransitioning.get()) {
                     _state.update { it.copy(isPlaying = false) }
                     persistCurrentProgress()
                 }
             }
 
             override fun stopped(mp: MediaPlayer) {
-                if (_state.value.mode == componentMode) {
+                if (_state.value.mode == componentMode && !playbackTransitioning.get()) {
                     _state.update { it.copy(isPlaying = false, isBuffering = false) }
                 }
             }
 
             override fun finished(mp: MediaPlayer) {
-                if (_state.value.mode == componentMode) {
+                if (_state.value.mode == componentMode && !playbackTransitioning.get()) {
                     _state.update {
                         it.copy(
                             isPlaying = false,
@@ -231,7 +337,7 @@ class VlcMediaPlayerController(
             }
 
             override fun error(mp: MediaPlayer) {
-                if (_state.value.mode == componentMode) {
+                if (_state.value.mode == componentMode && !playbackTransitioning.get()) {
                     _state.update {
                         it.copy(
                             isPlaying = false,
@@ -243,7 +349,7 @@ class VlcMediaPlayerController(
             }
 
             override fun timeChanged(mp: MediaPlayer, newTime: Long) {
-                if (_state.value.mode == componentMode) {
+                if (_state.value.mode == componentMode && !playbackTransitioning.get()) {
                     _state.update { it.copy(positionMs = newTime) }
                     val now = System.currentTimeMillis()
                     if (now - lastSavedProgressTimestamp >= 5_000L) {
@@ -271,6 +377,10 @@ class VlcMediaPlayerController(
         if (forceAudio) {
             playBackgroundAudio(details, details.audioStreams.firstOrNull(), startPositionMs)
             return
+        }
+
+        if (_state.value.currentVideo?.url != details.url) {
+            clearVideoFrames()
         }
 
         val chosenVideo = videoOption ?: pickInitialVideoStream(details)
@@ -342,6 +452,7 @@ class VlcMediaPlayerController(
 
     override fun playLocalFile(filePath: String, title: String, isAudioOnly: Boolean) {
         val mode = if (isAudioOnly) PlayerPlaybackMode.BACKGROUND_AUDIO else PlayerPlaybackMode.VIDEO
+        clearVideoFrames()
         activeLocalFilePath = filePath
         _state.update {
             it.copy(
@@ -356,16 +467,27 @@ class VlcMediaPlayerController(
                 errorMessage = null
             )
         }
+        val gen = playbackGeneration.incrementAndGet()
         vlcExecutor.execute {
+            if (playbackGeneration.get() != gen) return@execute
             if (!ensureVlcDiscovered()) return@execute
+            playbackTransitioning.set(true)
             runCatching { videoComponent?.mediaPlayer()?.controls()?.stop() }
             runCatching { audioComponent?.mediaPlayer()?.controls()?.stop() }
+            if (playbackGeneration.get() != gen) return@execute
             if (isAudioOnly) {
-                val player = getOrCreateAudioPlayer()?.mediaPlayer() ?: return@execute
+                val player = getOrCreateAudioPlayer()?.mediaPlayer()
+                if (player == null) {
+                    playbackTransitioning.set(false)
+                    return@execute
+                }
                 player.media().play(filePath, ":no-video")
             } else {
-                val comp = getOrCreateVideoSurface() ?: return@execute
-                waitForDisplayableCanvas(comp)
+                val comp = getOrCreateVideoPlayer()
+                if (comp == null) {
+                    playbackTransitioning.set(false)
+                    return@execute
+                }
                 comp.mediaPlayer().media().play(filePath)
             }
         }
@@ -462,11 +584,15 @@ class VlcMediaPlayerController(
         mode: PlayerPlaybackMode,
         startPositionMs: Long
     ) {
+        val gen = playbackGeneration.incrementAndGet()
         vlcExecutor.execute {
+            if (playbackGeneration.get() != gen) return@execute
             if (!ensureVlcDiscovered()) return@execute
 
+            playbackTransitioning.set(true)
             runCatching { videoComponent?.mediaPlayer()?.controls()?.stop() }
             runCatching { audioComponent?.mediaPlayer()?.controls()?.stop() }
+            if (playbackGeneration.get() != gen) return@execute
 
             val options = mutableListOf(
                 ":http-user-agent=${DesktopDownloader.USER_AGENT}",
@@ -479,17 +605,23 @@ class VlcMediaPlayerController(
             if (mode == PlayerPlaybackMode.BACKGROUND_AUDIO) {
                 val mrl = audioStream?.url ?: videoStream?.pairedAudioUrl ?: videoStream?.videoUrl
                 if (mrl.isNullOrBlank()) {
+                    playbackTransitioning.set(false)
                     _state.update {
                         it.copy(isBuffering = false, errorMessage = "No playable audio stream found")
                     }
                     return@execute
                 }
                 options.add(":no-video")
-                val player = getOrCreateAudioPlayer()?.mediaPlayer() ?: return@execute
+                val player = getOrCreateAudioPlayer()?.mediaPlayer()
+                if (player == null) {
+                    playbackTransitioning.set(false)
+                    return@execute
+                }
                 player.media().play(mrl, *options.toTypedArray())
             } else {
                 val mrl = videoStream?.videoUrl ?: audioStream?.url
                 if (mrl.isNullOrBlank()) {
+                    playbackTransitioning.set(false)
                     _state.update {
                         it.copy(isBuffering = false, errorMessage = "No playable video stream found")
                     }
@@ -501,17 +633,13 @@ class VlcMediaPlayerController(
                         options.add(":input-slave=$slaveAudio")
                     }
                 }
-                val comp = getOrCreateVideoSurface() ?: return@execute
-                waitForDisplayableCanvas(comp)
+                val comp = getOrCreateVideoPlayer()
+                if (comp == null) {
+                    playbackTransitioning.set(false)
+                    return@execute
+                }
                 comp.mediaPlayer().media().play(mrl, *options.toTypedArray())
             }
-        }
-    }
-
-    private fun waitForDisplayableCanvas(comp: EmbeddedMediaPlayerComponent) {
-        val deadline = System.currentTimeMillis() + 1500L
-        while (!comp.videoSurfaceComponent().isDisplayable && System.currentTimeMillis() < deadline) {
-            Thread.sleep(25L)
         }
     }
 
@@ -584,6 +712,9 @@ class VlcMediaPlayerController(
     override fun stop() {
         persistCurrentProgress()
         activeLocalFilePath = null
+        playbackGeneration.incrementAndGet()
+        playbackTransitioning.set(false)
+        clearVideoFrames()
         vlcExecutor.execute {
             runCatching { videoComponent?.mediaPlayer()?.controls()?.stop() }
             runCatching { audioComponent?.mediaPlayer()?.controls()?.stop() }
@@ -606,26 +737,34 @@ class VlcMediaPlayerController(
 
     override fun release() {
         persistCurrentProgress()
+        playbackGeneration.incrementAndGet()
         vlcExecutor.execute {
             runCatching { videoComponent?.release() }
             runCatching { audioComponent?.release() }
             videoComponent = null
             audioComponent = null
+            synchronized(frameLock) {
+                val cur = _currentFrame.value
+                _currentFrame.value = null
+                if (cur != null && !cur.skiaBitmap.isClosed) {
+                    runCatching { cur.skiaBitmap.close() }
+                }
+                while (retiringBitmaps.isNotEmpty()) {
+                    val bmp = retiringBitmaps.removeFirst()
+                    if (!bmp.isClosed) {
+                        runCatching { bmp.close() }
+                    }
+                }
+            }
         }
     }
 
     @Composable
     override fun VideoViewport(modifier: Modifier) {
         val playerState by state.collectAsState()
-        val surface = remember(playerState.vlcAvailable) { getOrCreateVideoSurface() }
-        if (surface != null) {
-            SwingPanel(
-                factory = {
-                    surface.apply { background = java.awt.Color.BLACK }
-                },
-                modifier = modifier
-            )
-        } else {
+        val frame by _currentFrame.collectAsState()
+
+        if (!playerState.vlcAvailable) {
             Box(
                 modifier = modifier.fillMaxSize().background(Color.Black),
                 contentAlignment = Alignment.Center
@@ -634,6 +773,47 @@ class VlcMediaPlayerController(
                     text = playerState.errorMessage ?: missingVlcMessage(),
                     color = Color.White
                 )
+            }
+            return
+        }
+
+        Box(
+            modifier = modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            val activeFrame = frame
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(Color.Black)
+                if (activeFrame != null && !activeFrame.skiaBitmap.isClosed) {
+                    val canvasW = size.width
+                    val canvasH = size.height
+                    if (canvasW > 0f && canvasH > 0f && activeFrame.width > 0 && activeFrame.height > 0) {
+                        val videoRatio = activeFrame.width.toFloat() / activeFrame.height.toFloat()
+                        val canvasRatio = canvasW / canvasH
+                        val dstW: Int
+                        val dstH: Int
+                        if (videoRatio > canvasRatio) {
+                            dstW = canvasW.roundToInt().coerceAtLeast(1)
+                            dstH = (canvasW / videoRatio).roundToInt().coerceAtLeast(1)
+                        } else {
+                            dstH = canvasH.roundToInt().coerceAtLeast(1)
+                            dstW = (canvasH * videoRatio).roundToInt().coerceAtLeast(1)
+                        }
+                        val offsetX = ((canvasW - dstW) / 2f).roundToInt()
+                        val offsetY = ((canvasH - dstH) / 2f).roundToInt()
+                        drawImage(
+                            image = activeFrame.imageBitmap,
+                            srcOffset = IntOffset.Zero,
+                            srcSize = IntSize(activeFrame.width, activeFrame.height),
+                            dstOffset = IntOffset(offsetX, offsetY),
+                            dstSize = IntSize(dstW, dstH),
+                            filterQuality = FilterQuality.Low
+                        )
+                    }
+                }
+            }
+            if (activeFrame == null && playerState.isBuffering) {
+                CircularProgressIndicator(color = Color.White)
             }
         }
     }

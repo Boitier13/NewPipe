@@ -32,10 +32,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.math.roundToInt
 import net.newpipe.app.model.DownloadStatus
 import net.newpipe.app.viewmodel.desktop.DownloadsViewModel
 import newpipe.shared.generated.resources.Res
@@ -148,6 +150,9 @@ fun DownloadsScreen(
                                         append(task.uploader)
                                         task.resolutionLabel?.let { append(" • $it") }
                                         task.statusMessage?.let { append(" • $it") }
+                                        if (task.status == DownloadStatus.COMPLETED && task.totalBytes > 0L) {
+                                            append(" (${formatBytes(task.totalBytes)})")
+                                        }
                                     }
                                     Text(
                                         text = sub,
@@ -205,25 +210,40 @@ fun DownloadsScreen(
                                 task.status == DownloadStatus.QUEUED
                             ) {
                                 Row(
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
+                                    val barModifier = Modifier
+                                        .weight(1f)
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
                                     if (task.progress > 0f) {
                                         LinearProgressIndicator(
-                                            progress = { task.progress },
-                                            modifier = Modifier.weight(1f)
+                                            progress = { task.progress.coerceIn(0f, 1f) },
+                                            modifier = barModifier
                                         )
                                     } else {
-                                        LinearProgressIndicator(modifier = Modifier.weight(1f))
+                                        LinearProgressIndicator(modifier = barModifier)
                                     }
+                                    val pct = (task.progress.coerceIn(0f, 1f) * 100f).roundToInt()
                                     val bytesInfo = buildString {
-                                        if (task.downloadedBytes > 0L) append(formatBytes(task.downloadedBytes))
-                                        if (task.totalBytes > 0L) append(" / ${formatBytes(task.totalBytes)}")
+                                        if (task.progress > 0f) {
+                                            append("$pct%")
+                                        }
+                                        if (task.downloadedBytes > 0L) {
+                                            if (isNotEmpty()) append(" • ")
+                                            append(formatBytes(task.downloadedBytes))
+                                            if (task.totalBytes > task.downloadedBytes) {
+                                                append(" / ${formatBytes(task.totalBytes)}")
+                                            }
+                                        }
                                     }
                                     if (bytesInfo.isNotEmpty()) {
                                         Text(
                                             text = bytesInfo,
-                                            style = MaterialTheme.typography.labelSmall
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Medium
                                         )
                                     }
                                 }

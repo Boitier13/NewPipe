@@ -228,18 +228,34 @@ class JVMDownloadController(
     }
 
     override fun openDownloadFolder(path: String) {
-        runCatching {
-            val file = File(path)
-            if (WindowsAppPaths.isWindows && file.exists()) {
-                ProcessBuilder("explorer.exe", "/select,\"${file.absolutePath}\"").start()
-            } else {
-                val target = if (file.isDirectory) file else (file.parentFile ?: WindowsAppPaths.defaultVideoDownloadDir())
-                if (target.exists() && Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(target)
+        scope.launch {
+            runCatching {
+                val targetDir = resolveTargetDirectoryForOpen(path)
+                if (!targetDir.exists()) {
+                    targetDir.mkdirs()
                 }
+                val openedWithAwt = Desktop.isDesktopSupported() &&
+                    Desktop.getDesktop().isSupported(Desktop.Action.OPEN) &&
+                    runCatching {
+                        Desktop.getDesktop().open(targetDir)
+                        true
+                    }.getOrElse { false }
+
+                if (!openedWithAwt) {
+                    if (WindowsAppPaths.isWindows) {
+                        ProcessBuilder("explorer.exe", targetDir.canonicalPath).start()
+                    } else {
+                        val cmd = if (System.getProperty("os.name").orEmpty().lowercase().contains("mac")) {
+                            "open"
+                        } else {
+                            "xdg-open"
+                        }
+                        ProcessBuilder(cmd, targetDir.canonicalPath).start()
+                    }
+                }
+            }.onFailure {
+                Logger.w(it) { "Unable to open folder for $path" }
             }
-        }.onFailure {
-            Logger.w(it) { "Unable to open folder for $path" }
         }
     }
 
@@ -251,7 +267,13 @@ class JVMDownloadController(
     ) {
         val tempFiles = mutableListOf<File>()
         try {
-            updateTask(taskId) { it.copy(status = DownloadStatus.DOWNLOADING, statusMessage = "Downloading...") }
+            updateTask(taskId) {
+                it.copy(
+                    status = DownloadStatus.DOWNLOADING,
+                    progress = 0.01f,
+                    statusMessage = "Downloading..."
+                )
+            }
 
             val pairedAudioUrl = if (option.isVideoOnly) {
                 option.pairedAudioUrl ?: details.audioStreams.firstOrNull()?.url
@@ -271,7 +293,7 @@ class JVMDownloadController(
                 updateTask(taskId) {
                     it.copy(
                         status = DownloadStatus.TRANSCODING,
-                        progress = 0.25f,
+                        progress = 0.02f,
                         statusMessage = "Downloading & muxing HLS..."
                     )
                 }
@@ -292,16 +314,35 @@ class JVMDownloadController(
                     args += listOf("-c", "copy")
                 }
                 args += listOf("-movflags", "+faststart", outputFile.absolutePath)
-                runFfmpeg(ffmpeg, args)
+                runFfmpeg(
+                    ffmpegExe = ffmpeg,
+                    args = args,
+                    durationSeconds = details.durationSeconds
+                ) { fraction, totalSize ->
+                    updateTask(taskId) { current ->
+                        val p = (0.02f + 0.96f * fraction).coerceIn(0.02f, 0.99f)
+                        val bytes = if (totalSize > 0L) totalSize else current.downloadedBytes
+                        current.copy(
+                            progress = p,
+                            downloadedBytes = bytes,
+                            totalBytes = if (fraction > 0.05f && bytes > 0L) {
+                                (bytes / fraction).toLong().coerceAtLeast(bytes)
+                            } else {
+                                current.totalBytes
+                            }
+                        )
+                    }
+                }
             } else if (!option.isVideoOnly || pairedAudioUrl == null) {
                 if (option.formatKey == "MPEG_4" && targetScaleHeight == null) {
                     downloadToFile(option.videoUrl, outputFile) { downloaded, total ->
-                        updateProgress(taskId, downloaded, total)
+                        updateProgress(taskId, downloaded, total, maxProgress = 0.99f)
                     }
                 } else {
                     val tmpVideo = tempFile("video", ".tmp").also(tempFiles::add)
+                    val downloadMax = if (targetScaleHeight != null) 0.60f else 0.92f
                     downloadToFile(option.videoUrl, tmpVideo) { downloaded, total ->
-                        updateProgress(taskId, downloaded, total)
+                        updateProgress(taskId, downloaded, total, maxProgress = downloadMax)
                     }
                     val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
                         settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
@@ -313,13 +354,13 @@ class JVMDownloadController(
                         updateTask(taskId) {
                             it.copy(
                                 status = DownloadStatus.TRANSCODING,
-                                progress = 0.95f,
+                                progress = downloadMax,
                                 statusMessage = "Encoding ${targetScaleHeight}p MP4..."
                             )
                         }
                         runFfmpeg(
-                            exe,
-                            listOf(
+                            ffmpegExe = exe,
+                            args = listOf(
                                 "-y",
                                 "-i", tmpVideo.absolutePath,
                                 "-vf", "scale=-2:$targetScaleHeight",
@@ -330,14 +371,26 @@ class JVMDownloadController(
                                 "-b:a", "128k",
                                 "-movflags", "+faststart",
                                 outputFile.absolutePath
-                            )
-                        )
+                            ),
+                            durationSeconds = details.durationSeconds
+                        ) { fraction, _ ->
+                            updateTask(taskId) {
+                                it.copy(progress = (downloadMax + (0.99f - downloadMax) * fraction).coerceIn(downloadMax, 0.99f))
+                            }
+                        }
                     } else if (ffmpeg != null) {
-                        updateTask(taskId) { it.copy(status = DownloadStatus.MUXING, statusMessage = "Converting to MP4...") }
+                        updateTask(taskId) {
+                            it.copy(status = DownloadStatus.MUXING, progress = 0.94f, statusMessage = "Converting to MP4...")
+                        }
                         runFfmpeg(
-                            ffmpeg,
-                            listOf("-y", "-i", tmpVideo.absolutePath, "-c", "copy", "-movflags", "+faststart", outputFile.absolutePath)
-                        )
+                            ffmpegExe = ffmpeg,
+                            args = listOf("-y", "-i", tmpVideo.absolutePath, "-c", "copy", "-movflags", "+faststart", outputFile.absolutePath),
+                            durationSeconds = details.durationSeconds
+                        ) { fraction, _ ->
+                            updateTask(taskId) {
+                                it.copy(progress = (0.94f + 0.05f * fraction).coerceIn(0.94f, 0.99f))
+                            }
+                        }
                     } else {
                         val fallbackWebm = uniqueOutputFile(outputFile.parentFile, outputFile.nameWithoutExtension, "webm")
                         tmpVideo.copyTo(fallbackWebm, overwrite = true)
@@ -350,18 +403,48 @@ class JVMDownloadController(
 
                 val vLen = probeContentLength(option.videoUrl)
                 val aLen = probeContentLength(pairedAudioUrl)
-                val combinedTotal = vLen + aLen
+                val bothLengthsKnown = vLen > 0L && aLen > 0L
+                val combinedTotal = if (bothLengthsKnown) vLen + aLen else 0L
+
+                val downloadCeiling = if (targetScaleHeight != null) 0.60f else 0.94f
+                val videoCeiling = if (bothLengthsKnown) {
+                    downloadCeiling * (vLen.toFloat() / combinedTotal.toFloat())
+                } else {
+                    downloadCeiling * 0.80f
+                }
 
                 var downloadedVideo = 0L
                 downloadToFile(option.videoUrl, videoTmp) { d, t ->
                     downloadedVideo = d
-                    val estTotal = if (combinedTotal > 0) combinedTotal else t
-                    updateProgress(taskId, d, estTotal)
+                    val videoRatio = if (t > 0L) (d.toFloat() / t.toFloat()).coerceIn(0f, 1f) else 0f
+                    val overallProgress = (videoRatio * videoCeiling).coerceIn(0f, videoCeiling)
+                    val estTotal = if (combinedTotal > 0L) combinedTotal else if (t > 0L) t else d
+                    updateTask(taskId) {
+                        it.copy(
+                            downloadedBytes = d,
+                            totalBytes = estTotal.coerceAtLeast(d),
+                            progress = overallProgress
+                        )
+                    }
                 }
 
                 downloadToFile(pairedAudioUrl, audioTmp) { d, t ->
-                    val estTotal = if (combinedTotal > 0) combinedTotal else (downloadedVideo + t)
-                    updateProgress(taskId, downloadedVideo + d, estTotal)
+                    val audioRatio = if (t > 0L) (d.toFloat() / t.toFloat()).coerceIn(0f, 1f) else 0f
+                    val overallProgress = (videoCeiling + audioRatio * (downloadCeiling - videoCeiling))
+                        .coerceIn(videoCeiling, downloadCeiling)
+                    val totalDownloaded = downloadedVideo + d
+                    val estTotal = when {
+                        combinedTotal > 0L -> combinedTotal
+                        t > 0L -> downloadedVideo + t
+                        else -> totalDownloaded
+                    }
+                    updateTask(taskId) {
+                        it.copy(
+                            downloadedBytes = totalDownloaded,
+                            totalBytes = estTotal.coerceAtLeast(totalDownloaded),
+                            progress = overallProgress
+                        )
+                    }
                 }
 
                 if (targetScaleHeight != null) {
@@ -373,13 +456,13 @@ class JVMDownloadController(
                     updateTask(taskId) {
                         it.copy(
                             status = DownloadStatus.TRANSCODING,
-                            progress = 0.95f,
+                            progress = downloadCeiling,
                             statusMessage = "Encoding ${targetScaleHeight}p MP4..."
                         )
                     }
                     runFfmpeg(
-                        ffmpeg,
-                        listOf(
+                        ffmpegExe = ffmpeg,
+                        args = listOf(
                             "-y",
                             "-i", videoTmp.absolutePath,
                             "-i", audioTmp.absolutePath,
@@ -391,13 +474,21 @@ class JVMDownloadController(
                             "-b:a", "128k",
                             "-movflags", "+faststart",
                             outputFile.absolutePath
-                        )
-                    )
+                        ),
+                        durationSeconds = details.durationSeconds
+                    ) { fraction, _ ->
+                        updateTask(taskId) {
+                            it.copy(
+                                progress = (downloadCeiling + (0.99f - downloadCeiling) * fraction)
+                                    .coerceIn(downloadCeiling, 0.99f)
+                            )
+                        }
+                    }
                 } else {
                     updateTask(taskId) {
                         it.copy(
                             status = DownloadStatus.MUXING,
-                            progress = 0.98f,
+                            progress = 0.96f,
                             statusMessage = "Muxing video & audio..."
                         )
                     }
@@ -427,8 +518,8 @@ class JVMDownloadController(
 
                         val fastMuxOk = runCatching {
                             runFfmpeg(
-                                ffmpeg,
-                                listOf(
+                                ffmpegExe = ffmpeg,
+                                args = listOf(
                                     "-y",
                                     "-i", videoTmp.absolutePath,
                                     "-i", audioTmp.absolutePath,
@@ -436,15 +527,23 @@ class JVMDownloadController(
                                     "-c:a", if (option.pairedAudioFormatKey == "M4A") "copy" else "aac",
                                     "-movflags", "+faststart",
                                     outputFile.absolutePath
-                                )
+                                ),
+                                durationSeconds = details.durationSeconds
                             )
                             true
                         }.getOrElse { false }
 
                         if (!fastMuxOk) {
+                            updateTask(taskId) {
+                                it.copy(
+                                    status = DownloadStatus.TRANSCODING,
+                                    progress = 0.65f,
+                                    statusMessage = "Encoding MP4..."
+                                )
+                            }
                             runFfmpeg(
-                                ffmpeg,
-                                listOf(
+                                ffmpegExe = ffmpeg,
+                                args = listOf(
                                     "-y",
                                     "-i", videoTmp.absolutePath,
                                     "-i", audioTmp.absolutePath,
@@ -453,8 +552,13 @@ class JVMDownloadController(
                                     "-c:a", "aac",
                                     "-movflags", "+faststart",
                                     outputFile.absolutePath
-                                )
-                            )
+                                ),
+                                durationSeconds = details.durationSeconds
+                            ) { fraction, _ ->
+                                updateTask(taskId) {
+                                    it.copy(progress = (0.65f + 0.34f * fraction).coerceIn(0.65f, 0.99f))
+                                }
+                            }
                         }
                     }
                 }
@@ -506,23 +610,25 @@ class JVMDownloadController(
                     "FFmpeg required for MP3 conversion. Install on Windows with: winget install Gyan.FFmpeg (or configure path in Settings)."
                 )
 
-            updateTask(taskId) { it.copy(status = DownloadStatus.DOWNLOADING, statusMessage = "Downloading audio...") }
+            updateTask(taskId) {
+                it.copy(status = DownloadStatus.DOWNLOADING, progress = 0.01f, statusMessage = "Downloading audio...")
+            }
             val audioTmp = tempFile("mp3_src", ".tmp").also(tempFiles::add)
             downloadToFile(audioOption.url, audioTmp) { downloaded, total ->
-                updateProgress(taskId, downloaded, total)
+                updateProgress(taskId, downloaded, total, maxProgress = 0.65f)
             }
 
             updateTask(taskId) {
                 it.copy(
                     status = DownloadStatus.TRANSCODING,
-                    progress = 0.95f,
+                    progress = 0.65f,
                     statusMessage = "Converting to MP3 ($bitrateArg)..."
                 )
             }
 
             runFfmpeg(
-                ffmpeg,
-                listOf(
+                ffmpegExe = ffmpeg,
+                args = listOf(
                     "-y",
                     "-i", audioTmp.absolutePath,
                     "-vn",
@@ -532,8 +638,13 @@ class JVMDownloadController(
                     "-metadata", "artist=${details.uploaderName}",
                     "-metadata", "comment=${details.url}",
                     outputFile.absolutePath
-                )
-            )
+                ),
+                durationSeconds = details.durationSeconds
+            ) { fraction, _ ->
+                updateTask(taskId) {
+                    it.copy(progress = (0.65f + 0.34f * fraction).coerceIn(0.65f, 0.99f))
+                }
+            }
 
             val finalSize = outputFile.takeIf { it.exists() }?.length() ?: 0L
             updateTask(taskId) {
@@ -576,10 +687,13 @@ class JVMDownloadController(
     ) {
         val tempFiles = mutableListOf<File>()
         try {
-            updateTask(taskId) { it.copy(status = DownloadStatus.DOWNLOADING, statusMessage = "Downloading audio...") }
+            updateTask(taskId) {
+                it.copy(status = DownloadStatus.DOWNLOADING, progress = 0.01f, statusMessage = "Downloading audio...")
+            }
             val rawTmp = tempFile("audio_raw", ".tmp").also(tempFiles::add)
+            val downloadMax = if (transcodeBitrateKbps != null) 0.65f else 0.95f
             downloadToFile(audioOption.url, rawTmp) { downloaded, total ->
-                updateProgress(taskId, downloaded, total)
+                updateProgress(taskId, downloaded, total, maxProgress = downloadMax)
             }
 
             if (transcodeBitrateKbps != null) {
@@ -591,13 +705,13 @@ class JVMDownloadController(
                 updateTask(taskId) {
                     it.copy(
                         status = DownloadStatus.TRANSCODING,
-                        progress = 0.95f,
+                        progress = downloadMax,
                         statusMessage = "Converting to M4A (${transcodeBitrateKbps} kbps)..."
                     )
                 }
                 runFfmpeg(
-                    ffmpeg,
-                    listOf(
+                    ffmpegExe = ffmpeg,
+                    args = listOf(
                         "-y",
                         "-i", rawTmp.absolutePath,
                         "-vn",
@@ -607,12 +721,19 @@ class JVMDownloadController(
                         "-metadata", "title=${details.title}",
                         "-metadata", "artist=${details.uploaderName}",
                         outputFile.absolutePath
-                    )
-                )
+                    ),
+                    durationSeconds = details.durationSeconds
+                ) { fraction, _ ->
+                    updateTask(taskId) {
+                        it.copy(progress = (downloadMax + (0.99f - downloadMax) * fraction).coerceIn(downloadMax, 0.99f))
+                    }
+                }
             } else {
                 val muxer = DesktopStreamMuxerRegistry.muxer
                 if (format == DownloadFormat.OGG_OPUS && muxer != null) {
-                    updateTask(taskId) { it.copy(status = DownloadStatus.MUXING, statusMessage = "Packaging Ogg/Opus...") }
+                    updateTask(taskId) {
+                        it.copy(status = DownloadStatus.MUXING, progress = 0.97f, statusMessage = "Packaging Ogg/Opus...")
+                    }
                     val muxed = runCatching {
                         muxer.demuxOggFromWebm(
                             sourcePath = rawTmp.absolutePath,
@@ -842,18 +963,66 @@ class JVMDownloadController(
         if (!ctx.isActive) throw CancellationException("Download cancelled")
     }
 
-    private fun runFfmpeg(ffmpegExe: File, args: List<String>) {
-        val command = listOf(ffmpegExe.absolutePath) + args
+    private suspend fun runFfmpeg(
+        ffmpegExe: File,
+        args: List<String>,
+        durationSeconds: Long = 0L,
+        onProgress: ((fraction: Float, totalSizeBytes: Long) -> Unit)? = null
+    ) {
+        val command = listOf(ffmpegExe.absolutePath, "-progress", "pipe:1", "-nostats") + args
         val process = ProcessBuilder(command)
             .redirectErrorStream(true)
             .start()
 
-        val logTail = process.inputStream.bufferedReader().use { reader ->
-            reader.lineSequence().toList().takeLast(12).joinToString("\n")
-        }
-        val code = process.waitFor()
-        if (code != 0) {
-            throw IOException("FFmpeg failed (exit $code): $logTail")
+        val ctx = currentCoroutineContext()
+        val recentErrors = ArrayDeque<String>(16)
+        var latestTotalSize = 0L
+        var latestOutTimeUs = 0L
+        var lastEmitMs = 0L
+
+        try {
+            process.inputStream.bufferedReader().use { reader ->
+                while (ctx.isActive) {
+                    val line = reader.readLine() ?: break
+                    when {
+                        line.startsWith("total_size=") -> {
+                            line.substringAfter('=').trim().toLongOrNull()?.let { latestTotalSize = it }
+                        }
+                        line.startsWith("out_time_us=") -> {
+                            line.substringAfter('=').trim().toLongOrNull()?.let { latestOutTimeUs = it }
+                        }
+                        line.startsWith("out_time_ms=") -> {
+                            if (latestOutTimeUs <= 0L) {
+                                line.substringAfter('=').trim().toLongOrNull()?.let { latestOutTimeUs = it }
+                            }
+                        }
+                        line.startsWith("progress=") -> {
+                            val now = System.currentTimeMillis()
+                            if (onProgress != null && now - lastEmitMs >= 180L) {
+                                lastEmitMs = now
+                                val fraction = computeFfmpegProgressFraction(latestOutTimeUs, durationSeconds)
+                                onProgress(fraction, latestTotalSize)
+                            }
+                        }
+                        line.isNotBlank() && !line.contains('=') -> {
+                            if (recentErrors.size >= 12) recentErrors.removeFirst()
+                            recentErrors.addLast(line)
+                        }
+                    }
+                }
+            }
+            if (!ctx.isActive) {
+                process.destroyForcibly()
+                throw CancellationException("FFmpeg cancelled")
+            }
+            val code = process.waitFor()
+            if (code != 0) {
+                throw IOException("FFmpeg failed (exit $code): ${recentErrors.joinToString("\n")}")
+            }
+            onProgress?.invoke(1f, latestTotalSize)
+        } catch (ce: CancellationException) {
+            process.destroyForcibly()
+            throw ce
         }
     }
 
@@ -910,14 +1079,44 @@ class JVMDownloadController(
         }
     }
 
-    private fun updateProgress(taskId: String, downloaded: Long, total: Long) {
-        val progress = if (total > 0L) (downloaded.toFloat() / total.toFloat()).coerceIn(0f, 0.99f) else 0f
+    private fun updateProgress(
+        taskId: String,
+        downloaded: Long,
+        total: Long,
+        maxProgress: Float = 0.99f
+    ) {
+        val progress = if (total > 0L) {
+            ((downloaded.toFloat() / total.toFloat()) * maxProgress).coerceIn(0f, maxProgress)
+        } else {
+            0f
+        }
         updateTask(taskId) {
             it.copy(
                 downloadedBytes = downloaded,
                 totalBytes = total.coerceAtLeast(downloaded),
                 progress = progress
             )
+        }
+    }
+
+    companion object {
+        internal fun resolveTargetDirectoryForOpen(
+            path: String,
+            fallbackDir: File = WindowsAppPaths.defaultVideoDownloadDir()
+        ): File {
+            if (path.isBlank()) return fallbackDir
+            val file = File(path)
+            return when {
+                file.isDirectory -> file
+                file.parentFile != null -> file.parentFile
+                else -> fallbackDir
+            }
+        }
+
+        internal fun computeFfmpegProgressFraction(outTimeUs: Long, durationSeconds: Long): Float {
+            if (outTimeUs <= 0L || durationSeconds <= 0L) return 0f
+            val durationUs = durationSeconds.toDouble() * 1_000_000.0
+            return (outTimeUs.toDouble() / durationUs).toFloat().coerceIn(0f, 1f)
         }
     }
 }

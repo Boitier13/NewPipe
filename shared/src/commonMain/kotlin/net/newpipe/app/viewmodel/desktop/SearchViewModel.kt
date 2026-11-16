@@ -107,7 +107,9 @@ class SearchViewModel(
             val local = database.getSearchSuggestions(newQuery, limit = 5)
             val remote = youTubeBackend.getSuggestions(newQuery)
             val merged = (local + remote).distinct().take(10)
-            _uiState.update { it.copy(suggestions = merged) }
+            _uiState.update { current ->
+                if (current.query == newQuery) current.copy(suggestions = merged) else current
+            }
         }
     }
 

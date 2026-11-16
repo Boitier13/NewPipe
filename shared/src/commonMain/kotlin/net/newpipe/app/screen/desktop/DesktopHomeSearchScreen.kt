@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -43,16 +44,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.newpipe.app.model.SearchFilter
 import net.newpipe.app.model.SearchResultItem
@@ -98,6 +107,22 @@ fun DesktopHomeSearchScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val recentSearches by viewModel.searchHistory.collectAsStateWithLifecycle()
     val isDataSaver by dataSaverController.isDataSaverEnabled.collectAsStateWithLifecycle()
+    val searchFocusRequester = remember { FocusRequester() }
+    var textFieldValue by remember {
+        mutableStateOf(TextFieldValue(state.query, TextRange(state.query.length)))
+    }
+
+    LaunchedEffect(focusSearchInitially) {
+        if (focusSearchInitially) {
+            searchFocusRequester.requestFocus()
+        }
+    }
+
+    LaunchedEffect(state.query) {
+        if (textFieldValue.text != state.query) {
+            textFieldValue = TextFieldValue(state.query, TextRange(state.query.length))
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         // Header: Search box + Accountless indicator + Data Saver quick switch
@@ -108,8 +133,11 @@ fun DesktopHomeSearchScreen(
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 OutlinedTextField(
-                    value = state.query,
-                    onValueChange = viewModel::onQueryChanged,
+                    value = textFieldValue,
+                    onValueChange = { next ->
+                        textFieldValue = next
+                        viewModel.onQueryChanged(next.text)
+                    },
                     placeholder = { Text(stringResource(Res.string.desktop_search_hint)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -121,11 +149,13 @@ fun DesktopHomeSearchScreen(
                     },
                     trailingIcon = {
                         Row {
-                            if (state.query.isNotEmpty()) {
+                            if (textFieldValue.text.isNotEmpty()) {
                                 IconButton(
                                     onClick = {
+                                        textFieldValue = TextFieldValue("")
                                         viewModel.onQueryChanged("")
                                         viewModel.loadTrending()
+                                        searchFocusRequester.requestFocus()
                                     }
                                 ) {
                                     Icon(
@@ -134,7 +164,7 @@ fun DesktopHomeSearchScreen(
                                     )
                                 }
                             }
-                            IconButton(onClick = { viewModel.submitSearch() }) {
+                            IconButton(onClick = { viewModel.submitSearch(textFieldValue.text) }) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_search),
                                     contentDescription = "Search"
@@ -143,15 +173,27 @@ fun DesktopHomeSearchScreen(
                         }
                     },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { viewModel.submitSearch() }),
+                    keyboardActions = KeyboardActions(onSearch = { viewModel.submitSearch(textFieldValue.text) }),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(searchFocusRequester)
                         .onPreviewKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown &&
-                                (event.key == Key.Enter || event.key == Key.NumPadEnter)
-                            ) {
-                                viewModel.submitSearch()
-                                true
+                            if (event.type == KeyEventType.KeyDown) {
+                                when (event.key) {
+                                    Key.Enter, Key.NumPadEnter -> {
+                                        viewModel.submitSearch(textFieldValue.text)
+                                        true
+                                    }
+                                    Key.Escape -> {
+                                        if (state.suggestions.isNotEmpty()) {
+                                            viewModel.clearSuggestions()
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    else -> false
+                                }
                             } else {
                                 false
                             }
@@ -160,7 +202,13 @@ fun DesktopHomeSearchScreen(
 
                 DropdownMenu(
                     expanded = state.suggestions.isNotEmpty(),
-                    onDismissRequest = viewModel::clearSuggestions
+                    onDismissRequest = viewModel::clearSuggestions,
+                    properties = PopupProperties(
+                        focusable = false,
+                        dismissOnBackPress = false,
+                        dismissOnClickOutside = true
+                    ),
+                    modifier = Modifier.widthIn(min = 320.dp, max = 600.dp)
                 ) {
                     state.suggestions.forEach { suggestion ->
                         DropdownMenuItem(

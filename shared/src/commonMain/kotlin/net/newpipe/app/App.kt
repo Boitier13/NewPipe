@@ -40,6 +40,7 @@ import net.newpipe.app.platform.DataSaverController
 import net.newpipe.app.platform.DownloadController
 import net.newpipe.app.platform.MediaPlayerController
 import net.newpipe.app.preferences.DesktopPreferences
+import net.newpipe.app.screen.desktop.ActiveDownloadBanner
 import net.newpipe.app.screen.desktop.MiniPlayerBar
 import net.newpipe.app.theme.AppTheme
 import newpipe.shared.generated.resources.Res
@@ -143,12 +144,13 @@ private fun DesktopShell(
     val downloads by downloadController.tasks.collectAsStateWithLifecycle()
     val isDataSaver by dataSaverController.isDataSaverEnabled.collectAsStateWithLifecycle()
 
-    val activeDownloadCount = downloads.count {
+    val activeDownloads = downloads.filter {
         it.status == DownloadStatus.QUEUED ||
             it.status == DownloadStatus.DOWNLOADING ||
             it.status == DownloadStatus.MUXING ||
             it.status == DownloadStatus.TRANSCODING
     }
+    val activeDownloadCount = activeDownloads.size
 
     val currentDest = navigator.backstack.lastOrNull()
     val showMiniPlayer = (playerState.currentVideo != null || playerState.localTitle != null) &&
@@ -238,6 +240,12 @@ private fun DesktopShell(
                         startDestination = startDestination,
                         onCloseRequest = onCloseRequest,
                         navigator = navigator
+                    )
+                }
+                if (activeDownloads.isNotEmpty() && currentDest != Destination.Downloads && !playerState.isFullscreen) {
+                    ActiveDownloadBanner(
+                        activeTasks = activeDownloads,
+                        onOpenDownloads = { navigator.navigateRoot(Destination.Downloads) }
                     )
                 }
                 if (showMiniPlayer) {
