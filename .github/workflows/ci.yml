@@ -54,11 +54,16 @@ jobs:
         shell: pwsh
         run: |
           $logFile = Join-Path $env:RUNNER_TEMP "gradle-shared-test.log"
-          ./gradlew :shared:jvmTest --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          ./gradlew :shared:jvmTest 2>&1 | Tee-Object -FilePath $logFile
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
-            Write-Host "::error::$tail"
+            $errLines = @(Get-Content -Path $logFile | Select-String -Pattern '^e: |FAILURE:|What went wrong:|Execution failed|FAILED|^\s+at |Assertion|Exception' -Context 0,2 | ForEach-Object { $_.ToString() }) | Select-Object -First 60
+            $xmlErrors = @(Get-ChildItem -Path "shared/build/test-results" -Recurse -Filter "*.xml" -ErrorAction SilentlyContinue | Select-String -Pattern '<failure|<error' -Context 0,3 | ForEach-Object { $_.ToString() }) | Select-Object -First 30
+            $msg = ((($errLines + $xmlErrors) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            if (-not $msg) {
+              $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            }
+            Write-Host "::error::$msg"
             exit $code
           }
 
@@ -66,11 +71,11 @@ jobs:
         shell: pwsh
         run: |
           $logFile = Join-Path $env:RUNNER_TEMP "gradle-desktop-check.log"
-          ./gradlew :desktopApp:check --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          ./gradlew :desktopApp:check 2>&1 | Tee-Object -FilePath $logFile
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
-            Write-Host "::error::$tail"
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
             exit $code
           }
 
@@ -78,11 +83,11 @@ jobs:
         shell: pwsh
         run: |
           $logFile = Join-Path $env:RUNNER_TEMP "gradle-distributable.log"
-          ./gradlew :desktopApp:createDistributable --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          ./gradlew :desktopApp:createDistributable 2>&1 | Tee-Object -FilePath $logFile
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
-            Write-Host "::error::$tail"
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
             exit $code
           }
 
@@ -112,11 +117,11 @@ jobs:
           $env:NEWPIPE_VERIFY_BUNDLED_DIR = $resDir
           $logFile = Join-Path $env:RUNNER_TEMP "gradle-smoke-test.log"
           $ErrorActionPreference = 'Continue'
-          ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.WindowsBundledRuntimeSmokeTest" --rerun-tasks --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.WindowsBundledRuntimeSmokeTest" --rerun-tasks 2>&1 | Tee-Object -FilePath $logFile
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
-            Write-Host "::error::$tail"
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
             exit $code
           }
 
@@ -124,11 +129,11 @@ jobs:
         shell: pwsh
         run: |
           $logFile = Join-Path $env:RUNNER_TEMP "gradle-msi.log"
-          ./gradlew :desktopApp:packageMsi --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          ./gradlew :desktopApp:packageMsi 2>&1 | Tee-Object -FilePath $logFile
           $code = $LASTEXITCODE
           if ($code -ne 0) {
-            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
-            Write-Host "::error::$tail"
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
             exit $code
           }
 
