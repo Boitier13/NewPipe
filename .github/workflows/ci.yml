@@ -50,8 +50,41 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./.github/scripts/prepare-windows-bundle.ps1
 
-      - name: Run shared JVM tests and build desktop app
-        run: ./gradlew :shared:jvmTest :desktopApp:check :desktopApp:createDistributable --stacktrace
+      - name: Run shared JVM tests
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-shared-test.log"
+          ./gradlew :shared:jvmTest --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+            Write-Host "::error::$tail"
+            exit $code
+          }
+
+      - name: Run desktopApp checks
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-desktop-check.log"
+          ./gradlew :desktopApp:check --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+            Write-Host "::error::$tail"
+            exit $code
+          }
+
+      - name: Build desktop distributable
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-distributable.log"
+          ./gradlew :desktopApp:createDistributable --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+            Write-Host "::error::$tail"
+            exit $code
+          }
 
       - name: Verify bundled FFmpeg and VLC in distributable
         shell: pwsh
@@ -77,10 +110,27 @@ jobs:
           }
 
           $env:NEWPIPE_VERIFY_BUNDLED_DIR = $resDir
-          ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.WindowsBundledRuntimeSmokeTest" --rerun-tasks --stacktrace
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-smoke-test.log"
+          $ErrorActionPreference = 'Continue'
+          ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.WindowsBundledRuntimeSmokeTest" --rerun-tasks --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+            Write-Host "::error::$tail"
+            exit $code
+          }
 
       - name: Package Windows MSI installer
-        run: ./gradlew :desktopApp:packageMsi --stacktrace
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-msi.log"
+          ./gradlew :desktopApp:packageMsi --stacktrace 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = ((Get-Content -Path $logFile -Tail 100) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+            Write-Host "::error::$tail"
+            exit $code
+          }
 
       - name: Verify Windows MSI installer artifact
         shell: pwsh
