@@ -36,6 +36,8 @@ object WindowsAppPaths {
 
     fun databaseFile(): File = File(appDataDir(), "newpipe.db")
 
+    fun downloadLogFile(): File = File(appDataDir(), "download_mux.log")
+
     fun defaultVideoDownloadDir(): File {
         val dir = File(System.getProperty("user.home"), "Downloads/NewPipe/Video")
         if (!dir.exists()) {

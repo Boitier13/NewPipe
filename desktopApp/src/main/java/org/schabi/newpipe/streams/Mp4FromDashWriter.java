@@ -142,8 +142,17 @@ public class Mp4FromDashWriter {
         outStream = null;
     }
 
-    @SuppressWarnings("MethodLength")
+    public interface ProgressListener {
+        void onProgress(long writtenBytes, long totalBytes);
+    }
+
     public void build(final SharpStream output) throws IOException {
+        build(output, null);
+    }
+
+    @SuppressWarnings("MethodLength")
+    public void build(final SharpStream output, final ProgressListener progressListener)
+            throws IOException {
         if (done) {
             throw new RuntimeException("already done");
         }
@@ -184,6 +193,9 @@ public class Mp4FromDashWriter {
 
             Mp4DashChunk chunk;
             while ((chunk = readers[i].getNextChunk(true)) != null) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new java.io.InterruptedIOException("Muxing cancelled");
+                }
 
                 if (defaultMediaTime[i] < 1 && chunk.moof.traf.tfhd.defaultSampleDuration > 0) {
                     defaultMediaTime[i] = chunk.moof.traf.tfhd.defaultSampleDuration;
@@ -312,6 +324,12 @@ public class Mp4FromDashWriter {
         final int[] sync = new int[singleSampleBuffer > 0 ? singleSampleBuffer : SAMPLES_PER_CHUNK];
 
         int written = readers.length;
+        long writtenSampleBytes = 0L;
+        long lastProgressNotifyMs = 0L;
+        if (progressListener != null) {
+            progressListener.onProgress(0L, totalSampleSize);
+        }
+
         while (written > 0) {
             written = 0;
 
@@ -331,6 +349,10 @@ public class Mp4FromDashWriter {
 
                 int j = 0;
                 for (; j < limit; j++) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new java.io.InterruptedIOException("Muxing cancelled");
+                    }
+
                     final Mp4DashSample sample = getNextSample(i);
 
                     if (sample == null) {
@@ -368,6 +390,14 @@ public class Mp4FromDashWriter {
                     }
 
                     outWrite(sample.data, sample.data.length);
+                    writtenSampleBytes += sample.data.length;
+                    if (progressListener != null && totalSampleSize > 0L) {
+                        final long now = System.currentTimeMillis();
+                        if (now - lastProgressNotifyMs >= 250L) {
+                            lastProgressNotifyMs = now;
+                            progressListener.onProgress(writtenSampleBytes, totalSampleSize);
+                        }
+                    }
                 }
 
                 if (j > 0) {
@@ -400,6 +430,10 @@ public class Mp4FromDashWriter {
             outSeek(ftypSize);
             outStream.write(auxBuffer.array(), 0, auxBuffer.capacity());
             auxBuffer = null;
+        }
+        outStream.flush();
+        if (progressListener != null) {
+            progressListener.onProgress(totalSampleSize, totalSampleSize);
         }
     }
 

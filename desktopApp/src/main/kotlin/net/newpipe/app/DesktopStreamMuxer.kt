@@ -20,7 +20,12 @@ import us.shandian.giga.io.FileStream
  */
 class DesktopStreamMuxer : StreamMuxer {
 
-    override fun muxMp4FromDash(videoPath: String, audioPath: String, outputPath: String) {
+    override fun muxMp4FromDash(
+        videoPath: String,
+        audioPath: String,
+        outputPath: String,
+        onProgress: ((fraction: Float) -> Unit)?
+    ) {
         File(outputPath).parentFile?.mkdirs()
         FileStream(videoPath).use { videoStream ->
             FileStream(audioPath).use { audioStream ->
@@ -28,13 +33,26 @@ class DesktopStreamMuxer : StreamMuxer {
                     val muxer = Mp4FromDashWriter(videoStream, audioStream)
                     muxer.parseSources()
                     muxer.selectTracks(0, 0)
-                    muxer.build(outStream)
+                    muxer.build(outStream) { written, total ->
+                        if (onProgress != null) {
+                            val fraction = if (total > 0L) {
+                                (written.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+                            } else {
+                                0f
+                            }
+                            onProgress(fraction)
+                        }
+                    }
                 }
             }
         }
     }
 
-    override fun remuxM4aFromDash(audioPath: String, outputPath: String) {
+    override fun remuxM4aFromDash(
+        audioPath: String,
+        outputPath: String,
+        onProgress: ((fraction: Float) -> Unit)?
+    ) {
         File(outputPath).parentFile?.mkdirs()
         FileStream(audioPath).use { source ->
             val reader = Mp4DashReader(source)
@@ -50,7 +68,16 @@ class DesktopStreamMuxer : StreamMuxer {
                 muxer.setMainBrand(0x4D344120) // "M4A "
                 muxer.parseSources()
                 muxer.selectTracks(0)
-                muxer.build(outStream)
+                muxer.build(outStream) { written, total ->
+                    if (onProgress != null) {
+                        val fraction = if (total > 0L) {
+                            (written.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                        onProgress(fraction)
+                    }
+                }
             }
         }
     }
