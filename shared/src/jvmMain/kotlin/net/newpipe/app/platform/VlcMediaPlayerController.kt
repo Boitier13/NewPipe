@@ -145,7 +145,7 @@ class VlcMediaPlayerController(
                 reusableFrameBytes = ByteArray(expectedBytes)
             }
             val dup = srcBuffer.duplicate()
-            dup.rewind()
+            dup.clear()
             if (dup.remaining() < expectedBytes) return@RenderCallback
             dup.get(reusableFrameBytes, 0, expectedBytes)
 

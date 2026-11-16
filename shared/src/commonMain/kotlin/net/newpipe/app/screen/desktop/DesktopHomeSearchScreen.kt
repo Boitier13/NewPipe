@@ -108,6 +108,7 @@ fun DesktopHomeSearchScreen(
     val recentSearches by viewModel.searchHistory.collectAsStateWithLifecycle()
     val isDataSaver by dataSaverController.isDataSaverEnabled.collectAsStateWithLifecycle()
     val searchFocusRequester = remember { FocusRequester() }
+    var lastDispatchedQuery by remember { mutableStateOf(state.query) }
     var textFieldValue by remember {
         mutableStateOf(TextFieldValue(state.query, TextRange(state.query.length)))
     }
@@ -119,7 +120,8 @@ fun DesktopHomeSearchScreen(
     }
 
     LaunchedEffect(state.query) {
-        if (textFieldValue.text != state.query) {
+        if (state.query != lastDispatchedQuery) {
+            lastDispatchedQuery = state.query
             textFieldValue = TextFieldValue(state.query, TextRange(state.query.length))
         }
     }
@@ -136,7 +138,10 @@ fun DesktopHomeSearchScreen(
                     value = textFieldValue,
                     onValueChange = { next ->
                         textFieldValue = next
-                        viewModel.onQueryChanged(next.text)
+                        if (next.text != lastDispatchedQuery) {
+                            lastDispatchedQuery = next.text
+                            viewModel.onQueryChanged(next.text)
+                        }
                     },
                     placeholder = { Text(stringResource(Res.string.desktop_search_hint)) },
                     singleLine = true,
@@ -152,6 +157,7 @@ fun DesktopHomeSearchScreen(
                             if (textFieldValue.text.isNotEmpty()) {
                                 IconButton(
                                     onClick = {
+                                        lastDispatchedQuery = ""
                                         textFieldValue = TextFieldValue("")
                                         viewModel.onQueryChanged("")
                                         viewModel.loadTrending()
