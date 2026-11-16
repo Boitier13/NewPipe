@@ -5,6 +5,7 @@
 
 package net.newpipe.app.platform
 
+import java.net.URI
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import net.newpipe.app.preferences.ContentPreferences
@@ -160,10 +161,20 @@ object DesktopStreamHelper {
         17, 36,
         18, 34, 35, 59, 78, 22, 37, 38,
         43, 44, 45, 46,
-        171, 172, 139, 140, 141, 249, 250, 251,
+        599, 139, 140, 141, 171, 172, 600, 249, 250, 251,
         160, 133, 134, 135, 212, 136, 298, 137, 299, 266,
+        394, 395, 396, 397, 398, 399, 400, 401,
         278, 242, 243, 244, 245, 246, 247, 248, 271, 272, 302, 303, 308, 313, 315
     )
+
+    private val AV1_YOUTUBE_ITAGS = setOf(394, 395, 396, 397, 398, 399, 400, 401)
+
+    private fun isAv1Stream(stream: VideoStream): Boolean {
+        val itagId = stream.itagItem?.id
+        if (itagId != null && AV1_YOUTUBE_ITAGS.contains(itagId)) return true
+        val codec = stream.codec
+        return !codec.isNullOrBlank() && codec.startsWith("av01", ignoreCase = true)
+    }
 
     fun <S : Stream> filterPlayableHttpStreams(streams: List<S>?, serviceId: Int): List<S> {
         if (streams.isNullOrEmpty()) return emptyList()
@@ -194,13 +205,22 @@ object DesktopStreamHelper {
                 !HIGH_RESOLUTION_SET.contains(stream.getResolution().replace(Regex("p\\d+$"), "p"))
         }
 
+        fun candidateScore(stream: VideoStream): Int {
+            var score = 0
+            if (stream.format == defaultFormat) score += 100
+            if (!isAv1Stream(stream)) score += 40
+            if (stream.isVideoOnly() == preferVideoOnlyStreams) score += 10
+            val fmtIdx = VIDEO_FORMAT_QUALITY_RANKING.indexOf(stream.format)
+            if (fmtIdx >= 0) score += fmtIdx
+            return score
+        }
+
         val byResolution = LinkedHashMap<String, VideoStream>()
         for (stream in initial) {
-            byResolution[stream.getResolution()] = stream
-        }
-        for (stream in initial) {
-            if (stream.format == defaultFormat) {
-                byResolution[stream.getResolution()] = stream
+            val res = stream.getResolution()
+            val existing = byResolution[res]
+            if (existing == null || candidateScore(stream) >= candidateScore(existing)) {
+                byResolution[res] = stream
             }
         }
 
@@ -356,5 +376,81 @@ object DesktopStreamHelper {
         val safeReplacement = Regex.escapeReplacement(replacementChar.ifEmpty { "_" })
         val cleaned = title.replace(Regex(pattern), safeReplacement).trim().trimEnd('.')
         return cleaned.ifBlank { "newpipe_download" }
+    }
+
+    data class HlsVideoVariant(
+        val resolution: String,
+        val height: Int,
+        val fps: Int,
+        val url: String
+    )
+
+    data class HlsMasterPlaylist(
+        val audioUrl: String?,
+        val variants: List<HlsVideoVariant>
+    )
+
+    /**
+     * Parses an HLS master playlist (#EXTM3U) into video resolution variants and default audio URI.
+     */
+    fun parseHlsMasterPlaylist(m3u8Text: String, baseUrl: String): HlsMasterPlaylist {
+        val lines = m3u8Text.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toList()
+
+        var defaultAudioUrl: String? = null
+        var fallbackAudioUrl: String? = null
+        val variants = mutableListOf<HlsVideoVariant>()
+
+        val uriRegex = Regex("""URI="([^"]+)"""")
+        val resRegex = Regex("""RESOLUTION=(\d+)x(\d+)""")
+        val fpsRegex = Regex("""FRAME-RATE=([\d.]+)""")
+
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i]
+            if (line.startsWith("#EXT-X-MEDIA:") && line.contains("TYPE=AUDIO")) {
+                val rawUri = uriRegex.find(line)?.groupValues?.getOrNull(1)
+                if (!rawUri.isNullOrBlank()) {
+                    val resolved = resolveUrl(baseUrl, rawUri)
+                    if (fallbackAudioUrl == null) fallbackAudioUrl = resolved
+                    if (defaultAudioUrl == null && (line.contains("DEFAULT=YES") || line.contains("AUTOSELECT=YES"))) {
+                        defaultAudioUrl = resolved
+                    }
+                }
+            } else if (line.startsWith("#EXT-X-STREAM-INF:")) {
+                val resMatch = resRegex.find(line)
+                val nextUrlLine = lines.drop(i + 1).firstOrNull { !it.startsWith("#") }
+                if (resMatch != null && !nextUrlLine.isNullOrBlank()) {
+                    val w = resMatch.groupValues[1].toIntOrNull() ?: 0
+                    val h = resMatch.groupValues[2].toIntOrNull() ?: 0
+                    val shortSide = minOf(w, h)
+                    if (shortSide > 0) {
+                        val fpsVal = fpsRegex.find(line)?.groupValues?.getOrNull(1)?.toFloatOrNull()?.toInt() ?: 30
+                        variants += HlsVideoVariant(
+                            resolution = "${shortSide}p",
+                            height = shortSide,
+                            fps = fpsVal,
+                            url = resolveUrl(baseUrl, nextUrlLine)
+                        )
+                    }
+                }
+            }
+            i++
+        }
+
+        return HlsMasterPlaylist(
+            audioUrl = defaultAudioUrl ?: fallbackAudioUrl,
+            variants = variants
+                .distinctBy { it.height }
+                .sortedByDescending { it.height }
+        )
+    }
+
+    private fun resolveUrl(baseUrl: String, relativeOrAbsolute: String): String {
+        return runCatching {
+            URI(baseUrl).resolve(relativeOrAbsolute).toString()
+        }.getOrElse { relativeOrAbsolute }
     }
 }

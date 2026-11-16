@@ -153,13 +153,13 @@ class VideoDetailViewModel(
         downloadController.enqueueMp4(details, option)
     }
 
-    fun downloadMp3(option: AudioStreamOption) {
+    fun downloadMp3(option: AudioStreamOption, targetBitrateKbps: Int? = null) {
         val details = _uiState.value.details ?: return
-        downloadController.enqueueMp3(details, option)
+        downloadController.enqueueMp3(details, option, targetBitrateKbps)
     }
 
-    fun downloadNativeAudio(option: AudioStreamOption) {
+    fun downloadNativeAudio(option: AudioStreamOption, targetBitrateKbps: Int? = null) {
         val details = _uiState.value.details ?: return
-        downloadController.enqueueNativeAudio(details, option)
+        downloadController.enqueueNativeAudio(details, option, targetBitrateKbps)
     }
 }

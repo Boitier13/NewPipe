@@ -32,6 +32,7 @@ import net.newpipe.app.model.StreamSummary
 import net.newpipe.app.model.VideoDetails
 import net.newpipe.app.model.VideoStreamOption
 import net.newpipe.app.preferences.ContentPreferences
+import net.newpipe.app.preferences.DesktopPreferences
 import net.newpipe.app.preferences.VideoAudioPreferences
 import org.jsoup.Jsoup
 import org.koin.core.annotation.Singleton
@@ -310,8 +311,12 @@ class JVMYouTubeBackend(
             val info = cached ?: StreamInfo.getInfo(yt, url).also {
                 infoCache.put(yt.serviceId, url, it, DesktopInfoCache.Type.STREAM)
             }
-            mapStreamInfoToVideoDetails(info).also {
-                println("[NewPipe] Extracted '${it.title}': ${it.videoStreams.size} video streams, ${it.audioStreams.size} audio streams")
+            mapStreamInfoToVideoDetails(info).also { details ->
+                println(
+                    "[NewPipe] Extracted '${details.title}': " +
+                        "videos=${details.videoStreams.map { "${it.resolution}(${it.formatLabel})" }}, " +
+                        "audios=${details.audioStreams.map { "${it.bitrateKbps}k(${it.formatLabel})" }}"
+                )
             }
         }
     }
@@ -552,7 +557,7 @@ class JVMYouTubeBackend(
             preferVideoOnlyStreams = true
         )
 
-        val videoOptions = sortedVideo.mapIndexed { idx, vs ->
+        val baseVideoOptions = sortedVideo.mapIndexed { idx, vs ->
             val pairedAudio = if (vs.isVideoOnly()) {
                 DesktopStreamHelper.findCompatibleAudioForVideo(sortedAudio, vs, dataSaver)
             } else {
@@ -564,6 +569,13 @@ class JVMYouTubeBackend(
         val audioOptions = sortedAudio.mapIndexed { idx, audio ->
             toAudioStreamOption(idx, audio, info.duration)
         }
+
+        val videoOptions = supplementWithHlsVariantsIfNeeded(
+            existing = baseVideoOptions,
+            hlsUrl = info.hlsUrl,
+            fallbackAudio = audioOptions.firstOrNull(),
+            showHigherResolutions = showHigherRes
+        )
 
         val plainDescription = extractPlainDescription(info.description)
         val isoDate = runCatching {
@@ -596,6 +608,59 @@ class JVMYouTubeBackend(
                 .map(::toStreamSummary)
         )
     }
+
+    private fun supplementWithHlsVariantsIfNeeded(
+        existing: List<VideoStreamOption>,
+        hlsUrl: String?,
+        fallbackAudio: AudioStreamOption?,
+        showHigherResolutions: Boolean
+    ): List<VideoStreamOption> {
+        val existingHeights = existing.mapNotNull { parseHeightFromResolution(it.resolution) }.toSet()
+        val missingTargets = DesktopPreferences.TARGET_VIDEO_HEIGHTS.filterNot { it in existingHeights }
+        if (missingTargets.isEmpty() || hlsUrl.isNullOrBlank()) {
+            return existing
+        }
+
+        val hlsResponse = runCatching { downloader.get(hlsUrl) }.getOrNull() ?: return existing
+        val body = hlsResponse.responseBody()
+        if (body.isBlank()) return existing
+
+        val playlist = DesktopStreamHelper.parseHlsMasterPlaylist(
+            body,
+            hlsResponse.latestUrl().ifBlank { hlsUrl }
+        )
+        if (playlist.variants.isEmpty()) return existing
+
+        val extra = playlist.variants
+            .filter { variant ->
+                variant.height !in existingHeights &&
+                    (showHigherResolutions || variant.height <= 1080)
+            }
+            .mapIndexed { idx, variant ->
+                val audioUri = playlist.audioUrl ?: fallbackAudio?.url
+                val needsPairedAudio = playlist.audioUrl != null
+                VideoStreamOption(
+                    id = "v_hls_${idx}_${variant.resolution}",
+                    resolution = variant.resolution,
+                    formatLabel = "HLS",
+                    formatKey = "HLS",
+                    isVideoOnly = needsPairedAudio,
+                    videoUrl = variant.url,
+                    pairedAudioUrl = if (needsPairedAudio) audioUri else null,
+                    pairedAudioFormatKey = if (needsPairedAudio) "HLS" else null,
+                    fps = variant.fps,
+                    approxSizeBytes = -1L
+                )
+            }
+
+        if (extra.isEmpty()) return existing
+        return (existing + extra).sortedWith { a, b ->
+            DesktopStreamHelper.compareResolution(b.resolution, a.resolution)
+        }
+    }
+
+    private fun parseHeightFromResolution(resolution: String): Int? =
+        resolution.substringBefore('p').toIntOrNull()
 
     private fun toVideoStreamOption(
         index: Int,

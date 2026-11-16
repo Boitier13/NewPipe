@@ -48,9 +48,17 @@ interface DownloadController {
 
     fun enqueueMp4(details: VideoDetails, videoOption: VideoStreamOption)
 
-    fun enqueueMp3(details: VideoDetails, audioOption: AudioStreamOption)
+    fun enqueueMp3(
+        details: VideoDetails,
+        audioOption: AudioStreamOption,
+        targetBitrateKbps: Int? = null
+    )
 
-    fun enqueueNativeAudio(details: VideoDetails, audioOption: AudioStreamOption)
+    fun enqueueNativeAudio(
+        details: VideoDetails,
+        audioOption: AudioStreamOption,
+        targetBitrateKbps: Int? = null
+    )
 
     fun cancelTask(taskId: String)
 

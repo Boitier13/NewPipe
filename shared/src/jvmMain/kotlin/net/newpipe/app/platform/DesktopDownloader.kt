@@ -44,6 +44,18 @@ class DesktopDownloader : Downloader() {
         .addInterceptor(CompressionInterceptor(Brotli, Gzip))
         .build()
 
+    /**
+     * Dedicated client for large media downloads without an overall [callTimeout] cap,
+     * keeping per-socket read/write timeouts so long video/audio transfers do not fail at 20s.
+     */
+    val mediaClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(0, TimeUnit.SECONDS)
+        .dns(ipv4FirstDns)
+        .build()
+
     fun setCookie(key: String, cookie: String) {
         cookies[key] = cookie
     }

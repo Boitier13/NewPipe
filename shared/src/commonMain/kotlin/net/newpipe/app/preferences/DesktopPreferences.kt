@@ -24,11 +24,13 @@ object DesktopPreferences {
     const val DEFAULT_DATA_SAVER_AUDIO_ONLY = false
     const val DEFAULT_VLC_PATH = ""
     const val DEFAULT_FFMPEG_PATH = ""
-    const val DEFAULT_MP3_BITRATE = "192k"
+    const val DEFAULT_MP3_BITRATE = "128k"
     const val DEFAULT_MINIMIZE_TO_TRAY_ON_AUDIO = true
     const val DEFAULT_PLAYER_VOLUME = 100
     const val DEFAULT_PLAYER_SPEED = 1.0f
 
+    val TARGET_VIDEO_HEIGHTS = listOf(1080, 720, 480, 360, 144)
     val DATA_SAVER_RESOLUTION_OPTIONS = listOf("480p", "360p", "240p", "144p")
-    val MP3_BITRATE_OPTIONS = listOf("128k", "192k", "320k")
+    val MP3_BITRATE_OPTIONS = listOf("96k", "128k", "192k", "320k")
+    val AUDIO_DOWNLOAD_BITRATES_KBPS = listOf(96, 128, 320)
 }

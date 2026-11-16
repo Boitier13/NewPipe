@@ -13,12 +13,14 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -100,7 +102,11 @@ class JVMDownloadController(
         jobs[taskId] = job
     }
 
-    override fun enqueueMp3(details: VideoDetails, audioOption: AudioStreamOption) {
+    override fun enqueueMp3(
+        details: VideoDetails,
+        audioOption: AudioStreamOption,
+        targetBitrateKbps: Int?
+    ) {
         val dir = resolveAudioFolder()
         val outputFile = uniqueOutputFile(dir, sanitizeTitle(details.title), DownloadFormat.MP3.extension)
         val taskId = UUID.randomUUID().toString()
@@ -108,15 +114,17 @@ class JVMDownloadController(
         val effectiveOption = if (dataSaverController.isDataSaverEnabled.value && details.audioStreams.isNotEmpty()) {
             details.audioStreams.minByOrNull { it.bitrateKbps } ?: audioOption
         } else {
-            audioOption
+            details.audioStreams.maxByOrNull { it.bitrateKbps } ?: audioOption
         }
+        val bitrateArg = targetBitrateKbps?.let { "${it}k" }
+            ?: settings.getString(DesktopPreferences.KEY_MP3_BITRATE, DesktopPreferences.DEFAULT_MP3_BITRATE)
 
         val initial = DownloadTaskItem(
             id = taskId,
             title = details.title,
             uploader = details.uploaderName,
             format = DownloadFormat.MP3,
-            resolutionLabel = settings.getString(DesktopPreferences.KEY_MP3_BITRATE, DesktopPreferences.DEFAULT_MP3_BITRATE),
+            resolutionLabel = bitrateArg.replace("k", " kbps"),
             progress = 0f,
             downloadedBytes = 0L,
             totalBytes = effectiveOption.approxSizeBytes.coerceAtLeast(0L),
@@ -127,31 +135,49 @@ class JVMDownloadController(
 
         val job = scope.launch {
             concurrencySemaphore.withPermit {
-                executeMp3Download(taskId, details, effectiveOption, outputFile)
+                executeMp3Download(taskId, details, effectiveOption, bitrateArg, outputFile)
             }
         }
         jobs[taskId] = job
     }
 
-    override fun enqueueNativeAudio(details: VideoDetails, audioOption: AudioStreamOption) {
+    override fun enqueueNativeAudio(
+        details: VideoDetails,
+        audioOption: AudioStreamOption,
+        targetBitrateKbps: Int?
+    ) {
         val dir = resolveAudioFolder()
-        val isOpus = audioOption.formatKey == "WEBMA_OPUS" || audioOption.formatKey == "WEBMA"
+        val matchingNativeM4a = if (targetBitrateKbps != null) {
+            details.audioStreams.firstOrNull {
+                it.formatKey == "M4A" && it.bitrateKbps == targetBitrateKbps
+            }
+        } else {
+            null
+        }
+        val willTranscodeM4a = targetBitrateKbps != null && matchingNativeM4a == null
+
+        val effectiveOption = when {
+            matchingNativeM4a != null -> matchingNativeM4a
+            willTranscodeM4a -> details.audioStreams.maxByOrNull { it.bitrateKbps } ?: audioOption
+            dataSaverController.isDataSaverEnabled.value && details.audioStreams.isNotEmpty() ->
+                details.audioStreams.minByOrNull { it.bitrateKbps } ?: audioOption
+            else -> audioOption
+        }
+
+        val isOpus = !willTranscodeM4a &&
+            matchingNativeM4a == null &&
+            (effectiveOption.formatKey == "WEBMA_OPUS" || effectiveOption.formatKey == "WEBMA")
         val format = if (isOpus) DownloadFormat.OGG_OPUS else DownloadFormat.M4A
         val outputFile = uniqueOutputFile(dir, sanitizeTitle(details.title), format.extension)
         val taskId = UUID.randomUUID().toString()
-
-        val effectiveOption = if (dataSaverController.isDataSaverEnabled.value && details.audioStreams.isNotEmpty()) {
-            details.audioStreams.minByOrNull { it.bitrateKbps } ?: audioOption
-        } else {
-            audioOption
-        }
+        val labelKbps = targetBitrateKbps ?: effectiveOption.bitrateKbps
 
         val initial = DownloadTaskItem(
             id = taskId,
             title = details.title,
             uploader = details.uploaderName,
             format = format,
-            resolutionLabel = "${effectiveOption.bitrateKbps} kbps",
+            resolutionLabel = "$labelKbps kbps",
             progress = 0f,
             downloadedBytes = 0L,
             totalBytes = effectiveOption.approxSizeBytes.coerceAtLeast(0L),
@@ -162,7 +188,14 @@ class JVMDownloadController(
 
         val job = scope.launch {
             concurrencySemaphore.withPermit {
-                executeNativeAudioDownload(taskId, details, effectiveOption, format, outputFile)
+                executeNativeAudioDownload(
+                    taskId = taskId,
+                    details = details,
+                    audioOption = effectiveOption,
+                    format = format,
+                    outputFile = outputFile,
+                    transcodeBitrateKbps = if (willTranscodeM4a) targetBitrateKbps else null
+                )
             }
         }
         jobs[taskId] = job
@@ -226,20 +259,80 @@ class JVMDownloadController(
                 null
             }
 
-            if (!option.isVideoOnly || pairedAudioUrl == null) {
-                if (option.formatKey == "MPEG_4") {
+            val isHls = option.formatKey == "HLS" || option.videoUrl.contains(".m3u8")
+            val targetScaleHeight = option.targetScaleHeight
+
+            if (isHls) {
+                val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
+                    settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
+                ) ?: throw IOException(
+                    "FFmpeg required for HLS stream download. Install FFmpeg or choose a direct MP4 stream."
+                )
+                updateTask(taskId) {
+                    it.copy(
+                        status = DownloadStatus.TRANSCODING,
+                        progress = 0.25f,
+                        statusMessage = "Downloading & muxing HLS..."
+                    )
+                }
+                val args = mutableListOf("-y", "-i", option.videoUrl)
+                if (!pairedAudioUrl.isNullOrBlank()) {
+                    args += listOf("-i", pairedAudioUrl)
+                }
+                if (targetScaleHeight != null) {
+                    args += listOf(
+                        "-vf", "scale=-2:$targetScaleHeight",
+                        "-c:v", "libx264",
+                        "-preset", "veryfast",
+                        "-crf", "23",
+                        "-c:a", "aac",
+                        "-b:a", "128k"
+                    )
+                } else {
+                    args += listOf("-c", "copy")
+                }
+                args += listOf("-movflags", "+faststart", outputFile.absolutePath)
+                runFfmpeg(ffmpeg, args)
+            } else if (!option.isVideoOnly || pairedAudioUrl == null) {
+                if (option.formatKey == "MPEG_4" && targetScaleHeight == null) {
                     downloadToFile(option.videoUrl, outputFile) { downloaded, total ->
                         updateProgress(taskId, downloaded, total)
                     }
                 } else {
-                    val tmpVideo = tempFile("video", ".webm").also(tempFiles::add)
+                    val tmpVideo = tempFile("video", ".tmp").also(tempFiles::add)
                     downloadToFile(option.videoUrl, tmpVideo) { downloaded, total ->
                         updateProgress(taskId, downloaded, total)
                     }
                     val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
                         settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
                     )
-                    if (ffmpeg != null) {
+                    if (targetScaleHeight != null) {
+                        val exe = ffmpeg ?: throw IOException(
+                            "FFmpeg required to convert video to ${targetScaleHeight}p."
+                        )
+                        updateTask(taskId) {
+                            it.copy(
+                                status = DownloadStatus.TRANSCODING,
+                                progress = 0.95f,
+                                statusMessage = "Encoding ${targetScaleHeight}p MP4..."
+                            )
+                        }
+                        runFfmpeg(
+                            exe,
+                            listOf(
+                                "-y",
+                                "-i", tmpVideo.absolutePath,
+                                "-vf", "scale=-2:$targetScaleHeight",
+                                "-c:v", "libx264",
+                                "-preset", "veryfast",
+                                "-crf", "23",
+                                "-c:a", "aac",
+                                "-b:a", "128k",
+                                "-movflags", "+faststart",
+                                outputFile.absolutePath
+                            )
+                        )
+                    } else if (ffmpeg != null) {
                         updateTask(taskId) { it.copy(status = DownloadStatus.MUXING, statusMessage = "Converting to MP4...") }
                         runFfmpeg(
                             ffmpeg,
@@ -255,8 +348,8 @@ class JVMDownloadController(
                 val videoTmp = tempFile("dash_v", ".tmp").also(tempFiles::add)
                 val audioTmp = tempFile("dash_a", ".tmp").also(tempFiles::add)
 
-                val vLen = runCatching { downloader.getContentLength(option.videoUrl) }.getOrElse { 0L }.coerceAtLeast(0L)
-                val aLen = runCatching { downloader.getContentLength(pairedAudioUrl) }.getOrElse { 0L }.coerceAtLeast(0L)
+                val vLen = probeContentLength(option.videoUrl)
+                val aLen = probeContentLength(pairedAudioUrl)
                 val combinedTotal = vLen + aLen
 
                 var downloadedVideo = 0L
@@ -271,67 +364,98 @@ class JVMDownloadController(
                     updateProgress(taskId, downloadedVideo + d, estTotal)
                 }
 
-                updateTask(taskId) {
-                    it.copy(
-                        status = DownloadStatus.MUXING,
-                        progress = 0.98f,
-                        statusMessage = "Muxing video & audio..."
-                    )
-                }
-
-                val muxer = DesktopStreamMuxerRegistry.muxer
-                val compatibleMp4Pair = option.formatKey == "MPEG_4" &&
-                    (option.pairedAudioFormatKey == null || option.pairedAudioFormatKey == "M4A")
-
-                val muxSucceededWithJava = compatibleMp4Pair && muxer != null && runCatching {
-                    muxer.muxMp4FromDash(
-                        videoTmp.absolutePath,
-                        audioTmp.absolutePath,
-                        outputFile.absolutePath
-                    )
-                    true
-                }.getOrElse {
-                    Logger.w(it) { "Pure-Java MP4 DASH muxer failed, falling back to FFmpeg" }
-                    false
-                }
-
-                if (!muxSucceededWithJava) {
+                if (targetScaleHeight != null) {
                     val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
                         settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
                     ) ?: throw IOException(
-                        "FFmpeg not found for muxing ${option.formatLabel} stream. Select an MP4 stream or install FFmpeg."
+                        "FFmpeg required to convert video to ${targetScaleHeight}p."
                     )
+                    updateTask(taskId) {
+                        it.copy(
+                            status = DownloadStatus.TRANSCODING,
+                            progress = 0.95f,
+                            statusMessage = "Encoding ${targetScaleHeight}p MP4..."
+                        )
+                    }
+                    runFfmpeg(
+                        ffmpeg,
+                        listOf(
+                            "-y",
+                            "-i", videoTmp.absolutePath,
+                            "-i", audioTmp.absolutePath,
+                            "-vf", "scale=-2:$targetScaleHeight",
+                            "-c:v", "libx264",
+                            "-preset", "veryfast",
+                            "-crf", "23",
+                            "-c:a", "aac",
+                            "-b:a", "128k",
+                            "-movflags", "+faststart",
+                            outputFile.absolutePath
+                        )
+                    )
+                } else {
+                    updateTask(taskId) {
+                        it.copy(
+                            status = DownloadStatus.MUXING,
+                            progress = 0.98f,
+                            statusMessage = "Muxing video & audio..."
+                        )
+                    }
 
-                    val fastMuxOk = runCatching {
-                        runFfmpeg(
-                            ffmpeg,
-                            listOf(
-                                "-y",
-                                "-i", videoTmp.absolutePath,
-                                "-i", audioTmp.absolutePath,
-                                "-c:v", "copy",
-                                "-c:a", if (option.pairedAudioFormatKey == "M4A") "copy" else "aac",
-                                "-movflags", "+faststart",
-                                outputFile.absolutePath
-                            )
+                    val muxer = DesktopStreamMuxerRegistry.muxer
+                    val compatibleMp4Pair = option.formatKey == "MPEG_4" &&
+                        (option.pairedAudioFormatKey == null || option.pairedAudioFormatKey == "M4A")
+
+                    val muxSucceededWithJava = compatibleMp4Pair && muxer != null && runCatching {
+                        muxer.muxMp4FromDash(
+                            videoTmp.absolutePath,
+                            audioTmp.absolutePath,
+                            outputFile.absolutePath
                         )
                         true
-                    }.getOrElse { false }
+                    }.getOrElse {
+                        Logger.w(it) { "Pure-Java MP4 DASH muxer failed, falling back to FFmpeg" }
+                        false
+                    }
 
-                    if (!fastMuxOk) {
-                        runFfmpeg(
-                            ffmpeg,
-                            listOf(
-                                "-y",
-                                "-i", videoTmp.absolutePath,
-                                "-i", audioTmp.absolutePath,
-                                "-c:v", "libx264",
-                                "-preset", "veryfast",
-                                "-c:a", "aac",
-                                "-movflags", "+faststart",
-                                outputFile.absolutePath
-                            )
+                    if (!muxSucceededWithJava) {
+                        val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
+                            settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
+                        ) ?: throw IOException(
+                            "FFmpeg not found for muxing ${option.formatLabel} stream. Select an MP4 stream or install FFmpeg."
                         )
+
+                        val fastMuxOk = runCatching {
+                            runFfmpeg(
+                                ffmpeg,
+                                listOf(
+                                    "-y",
+                                    "-i", videoTmp.absolutePath,
+                                    "-i", audioTmp.absolutePath,
+                                    "-c:v", "copy",
+                                    "-c:a", if (option.pairedAudioFormatKey == "M4A") "copy" else "aac",
+                                    "-movflags", "+faststart",
+                                    outputFile.absolutePath
+                                )
+                            )
+                            true
+                        }.getOrElse { false }
+
+                        if (!fastMuxOk) {
+                            runFfmpeg(
+                                ffmpeg,
+                                listOf(
+                                    "-y",
+                                    "-i", videoTmp.absolutePath,
+                                    "-i", audioTmp.absolutePath,
+                                    "-c:v", "libx264",
+                                    "-preset", "veryfast",
+                                    "-c:a", "aac",
+                                    "-movflags", "+faststart",
+                                    outputFile.absolutePath
+                                )
+                            )
+                        }
                     }
                 }
             }
@@ -352,6 +476,8 @@ class JVMDownloadController(
             throw ce
         } catch (t: Throwable) {
             Logger.e(t) { "MP4 download failed for ${details.title}" }
+            System.err.println("[NewPipe] MP4 download failed for ${details.title}: ${t.javaClass.simpleName}: ${t.message}")
+            t.printStackTrace(System.err)
             outputFile.delete()
             updateTask(taskId) {
                 it.copy(
@@ -369,6 +495,7 @@ class JVMDownloadController(
         taskId: String,
         details: VideoDetails,
         audioOption: AudioStreamOption,
+        bitrateArg: String,
         outputFile: File
     ) {
         val tempFiles = mutableListOf<File>()
@@ -389,14 +516,10 @@ class JVMDownloadController(
                 it.copy(
                     status = DownloadStatus.TRANSCODING,
                     progress = 0.95f,
-                    statusMessage = "Converting to MP3..."
+                    statusMessage = "Converting to MP3 ($bitrateArg)..."
                 )
             }
 
-            val bitrate = settings.getString(
-                DesktopPreferences.KEY_MP3_BITRATE,
-                DesktopPreferences.DEFAULT_MP3_BITRATE
-            )
             runFfmpeg(
                 ffmpeg,
                 listOf(
@@ -404,7 +527,7 @@ class JVMDownloadController(
                     "-i", audioTmp.absolutePath,
                     "-vn",
                     "-codec:a", "libmp3lame",
-                    "-b:a", bitrate,
+                    "-b:a", bitrateArg,
                     "-metadata", "title=${details.title}",
                     "-metadata", "artist=${details.uploaderName}",
                     "-metadata", "comment=${details.url}",
@@ -428,6 +551,8 @@ class JVMDownloadController(
             throw ce
         } catch (t: Throwable) {
             Logger.e(t) { "MP3 download failed for ${details.title}" }
+            System.err.println("[NewPipe] MP3 download failed for ${details.title}: ${t.javaClass.simpleName}: ${t.message}")
+            t.printStackTrace(System.err)
             outputFile.delete()
             updateTask(taskId) {
                 it.copy(
@@ -446,7 +571,8 @@ class JVMDownloadController(
         details: VideoDetails,
         audioOption: AudioStreamOption,
         format: DownloadFormat,
-        outputFile: File
+        outputFile: File,
+        transcodeBitrateKbps: Int? = null
     ) {
         val tempFiles = mutableListOf<File>()
         try {
@@ -456,37 +582,66 @@ class JVMDownloadController(
                 updateProgress(taskId, downloaded, total)
             }
 
-            val muxer = DesktopStreamMuxerRegistry.muxer
-            if (format == DownloadFormat.OGG_OPUS && muxer != null) {
-                updateTask(taskId) { it.copy(status = DownloadStatus.MUXING, statusMessage = "Packaging Ogg/Opus...") }
-                val muxed = runCatching {
-                    muxer.demuxOggFromWebm(
-                        sourcePath = rawTmp.absolutePath,
-                        outputPath = outputFile.absolutePath,
-                        url = details.url,
-                        category = details.category,
-                        uploaderName = details.uploaderName,
-                        title = details.title,
-                        isoDate = details.isoUploadDate
+            if (transcodeBitrateKbps != null) {
+                val ffmpeg = WindowsAppPaths.findFfmpegExecutable(
+                    settings.getString(DesktopPreferences.KEY_FFMPEG_PATH, "")
+                ) ?: throw IOException(
+                    "FFmpeg required to transcode audio to ${transcodeBitrateKbps} kbps."
+                )
+                updateTask(taskId) {
+                    it.copy(
+                        status = DownloadStatus.TRANSCODING,
+                        progress = 0.95f,
+                        statusMessage = "Converting to M4A (${transcodeBitrateKbps} kbps)..."
                     )
-                    true
-                }.getOrElse { false }
-                if (!muxed) {
-                    val webmOut = uniqueOutputFile(outputFile.parentFile, outputFile.nameWithoutExtension, "webm")
-                    rawTmp.copyTo(webmOut, overwrite = true)
-                    updateTask(taskId) { it.copy(outputPath = webmOut.absolutePath) }
                 }
+                runFfmpeg(
+                    ffmpeg,
+                    listOf(
+                        "-y",
+                        "-i", rawTmp.absolutePath,
+                        "-vn",
+                        "-codec:a", "aac",
+                        "-b:a", "${transcodeBitrateKbps}k",
+                        "-movflags", "+faststart",
+                        "-metadata", "title=${details.title}",
+                        "-metadata", "artist=${details.uploaderName}",
+                        outputFile.absolutePath
+                    )
+                )
             } else {
-                val remuxed = if (muxer != null && format == DownloadFormat.M4A) {
-                    runCatching {
-                        muxer.remuxM4aFromDash(rawTmp.absolutePath, outputFile.absolutePath)
+                val muxer = DesktopStreamMuxerRegistry.muxer
+                if (format == DownloadFormat.OGG_OPUS && muxer != null) {
+                    updateTask(taskId) { it.copy(status = DownloadStatus.MUXING, statusMessage = "Packaging Ogg/Opus...") }
+                    val muxed = runCatching {
+                        muxer.demuxOggFromWebm(
+                            sourcePath = rawTmp.absolutePath,
+                            outputPath = outputFile.absolutePath,
+                            url = details.url,
+                            category = details.category,
+                            uploaderName = details.uploaderName,
+                            title = details.title,
+                            isoDate = details.isoUploadDate
+                        )
                         true
                     }.getOrElse { false }
+                    if (!muxed) {
+                        val webmOut = uniqueOutputFile(outputFile.parentFile, outputFile.nameWithoutExtension, "webm")
+                        rawTmp.copyTo(webmOut, overwrite = true)
+                        updateTask(taskId) { it.copy(outputPath = webmOut.absolutePath) }
+                    }
                 } else {
-                    false
-                }
-                if (!remuxed) {
-                    rawTmp.copyTo(outputFile, overwrite = true)
+                    val remuxed = if (muxer != null && format == DownloadFormat.M4A) {
+                        runCatching {
+                            muxer.remuxM4aFromDash(rawTmp.absolutePath, outputFile.absolutePath)
+                            true
+                        }.getOrElse { false }
+                    } else {
+                        false
+                    }
+                    if (!remuxed) {
+                        rawTmp.copyTo(outputFile, overwrite = true)
+                    }
                 }
             }
 
@@ -506,6 +661,8 @@ class JVMDownloadController(
             throw ce
         } catch (t: Throwable) {
             Logger.e(t) { "Audio download failed for ${details.title}" }
+            System.err.println("[NewPipe] Audio download failed for ${details.title}: ${t.javaClass.simpleName}: ${t.message}")
+            t.printStackTrace(System.err)
             outputFile.delete()
             updateTask(taskId) {
                 it.copy(
@@ -519,6 +676,20 @@ class JVMDownloadController(
         }
     }
 
+    private fun probeContentLength(url: String): Long = runCatching {
+        val probeClient = downloader.mediaClient.newBuilder()
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build()
+        val req = Request.Builder()
+            .head()
+            .url(url)
+            .addHeader("User-Agent", DesktopDownloader.USER_AGENT)
+            .build()
+        probeClient.newCall(req).execute().use { resp ->
+            resp.header("Content-Length")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+        }
+    }.getOrElse { 0L }
+
     private suspend fun downloadToFile(
         url: String,
         target: File,
@@ -529,63 +700,146 @@ class JVMDownloadController(
             DownloadPreferences.DEFAULT_MAXIMUM_RETRIES
         ).toIntOrNull()?.coerceIn(0, 15) ?: 3
 
+        target.parentFile?.mkdirs()
+        target.delete()
+
         var attempt = 0
         var lastError: Throwable? = null
         while (attempt <= maxRetries) {
             try {
-                downloadSingleAttempt(url, target, onProgress)
+                downloadChunkedOrDirect(url, target, onProgress)
                 return
             } catch (ce: CancellationException) {
                 throw ce
             } catch (t: Throwable) {
                 lastError = t
                 attempt++
+                System.err.println("[NewPipe] Download attempt $attempt/$maxRetries failed (${t.javaClass.simpleName}): ${t.message}")
+                if (attempt <= maxRetries) {
+                    delay(500L * attempt)
+                }
             }
         }
         throw lastError ?: IOException("Failed to download $url")
     }
 
-    private suspend fun downloadSingleAttempt(
+    private suspend fun downloadChunkedOrDirect(
         url: String,
         target: File,
         onProgress: (downloaded: Long, total: Long) -> Unit
     ) {
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("User-Agent", DesktopDownloader.USER_AGENT)
-            .build()
+        val chunkSize = 2L * 1024L * 1024L
+        var downloaded = if (target.exists()) target.length().coerceAtLeast(0L) else 0L
+        var knownTotal = -1L
+        var useRange = true
+        val ctx = currentCoroutineContext()
 
-        downloader.client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("HTTP ${response.code}: ${response.message}")
-            }
-            val body = response.body
-            val total = body.contentLength()
-            target.parentFile?.mkdirs()
-            val ctx = currentCoroutineContext()
+        while (ctx.isActive) {
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", DesktopDownloader.USER_AGENT)
 
-            body.byteStream().use { input ->
-                FileOutputStream(target).buffered().use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    var downloaded = 0L
-                    var lastEmit = 0L
-                    while (ctx.isActive) {
-                        val read = input.read(buffer)
-                        if (read == -1) break
-                        output.write(buffer, 0, read)
-                        downloaded += read
-                        val now = System.currentTimeMillis()
-                        if (now - lastEmit >= 120L) {
-                            lastEmit = now
-                            onProgress(downloaded, total)
-                        }
-                    }
-                    if (!ctx.isActive) throw CancellationException("Download cancelled")
-                    output.flush()
-                    onProgress(downloaded, if (total > 0) total else downloaded)
+            if (useRange) {
+                val rangeEnd = if (knownTotal > 0L) {
+                    minOf(downloaded + chunkSize - 1L, knownTotal - 1L)
+                } else {
+                    downloaded + chunkSize - 1L
                 }
+                if (knownTotal > 0L && downloaded >= knownTotal) {
+                    onProgress(downloaded, knownTotal)
+                    return
+                }
+                reqBuilder.addHeader("Range", "bytes=$downloaded-$rangeEnd")
+            }
+
+            var shouldContinueChunkLoop = false
+
+            downloader.mediaClient.newCall(reqBuilder.build()).execute().use { response ->
+                if (response.code == 416) {
+                    val rangeTotal = response.header("Content-Range")
+                        ?.substringAfter('/', "")
+                        ?.trim()
+                        ?.toLongOrNull()
+                    val resolvedTotal = rangeTotal?.takeIf { it > 0L } ?: knownTotal
+                    if (resolvedTotal > 0L && downloaded >= resolvedTotal) {
+                        onProgress(downloaded, resolvedTotal)
+                        return
+                    }
+                    target.delete()
+                    downloaded = 0L
+                    knownTotal = -1L
+                    useRange = false
+                    shouldContinueChunkLoop = true
+                    return@use
+                }
+
+                if (!response.isSuccessful) {
+                    throw IOException("HTTP ${response.code}: ${response.message}")
+                }
+
+                val isPartial = response.code == 206
+                if (isPartial) {
+                    val contentRangeTotal = response.header("Content-Range")
+                        ?.substringAfter('/', "")
+                        ?.trim()
+                        ?.toLongOrNull()
+                    if (contentRangeTotal != null && contentRangeTotal > 0L) {
+                        knownTotal = contentRangeTotal
+                    }
+                } else {
+                    // Full 200 response (server ignored Range or Range disabled)
+                    target.delete()
+                    downloaded = 0L
+                    val bodyLen = response.body.contentLength()
+                    if (bodyLen > 0L) {
+                        knownTotal = bodyLen
+                    }
+                }
+
+                val body = response.body
+                var bytesThisResponse = 0L
+                val append = isPartial && downloaded > 0L
+                body.byteStream().use { input ->
+                    FileOutputStream(target, append).buffered().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        var lastEmit = 0L
+                        while (ctx.isActive) {
+                            val read = input.read(buffer)
+                            if (read == -1) break
+                            output.write(buffer, 0, read)
+                            downloaded += read
+                            bytesThisResponse += read
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmit >= 120L) {
+                                lastEmit = now
+                                onProgress(downloaded, knownTotal)
+                            }
+                        }
+                        if (!ctx.isActive) throw CancellationException("Download cancelled")
+                        output.flush()
+                    }
+                }
+
+                val finalTotal = if (knownTotal > 0L) knownTotal else downloaded
+                onProgress(downloaded, finalTotal)
+
+                if (!isPartial) {
+                    return
+                }
+                if (knownTotal > 0L && downloaded >= knownTotal) {
+                    return
+                }
+                if (bytesThisResponse == 0L || (knownTotal <= 0L && bytesThisResponse < chunkSize)) {
+                    return
+                }
+                shouldContinueChunkLoop = true
+            }
+
+            if (!shouldContinueChunkLoop) {
+                return
             }
         }
+        if (!ctx.isActive) throw CancellationException("Download cancelled")
     }
 
     private fun runFfmpeg(ffmpegExe: File, args: List<String>) {

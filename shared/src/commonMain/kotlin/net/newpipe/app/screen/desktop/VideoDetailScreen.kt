@@ -74,6 +74,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import net.newpipe.app.model.AudioStreamOption
+import net.newpipe.app.model.DesktopDownloadOptionsHelper
 import net.newpipe.app.model.DownloadFormat
 import net.newpipe.app.model.PlayerPlaybackMode
 import net.newpipe.app.model.PlayerState
@@ -81,9 +82,11 @@ import net.newpipe.app.model.VideoDetails
 import net.newpipe.app.model.VideoStreamOption
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
+import net.newpipe.app.preferences.DesktopPreferences
 import net.newpipe.app.viewmodel.desktop.VideoDetailViewModel
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.cancel
+import newpipe.shared.generated.resources.desktop_audio_bitrate
 import newpipe.shared.generated.resources.desktop_audio_track
 import newpipe.shared.generated.resources.desktop_background_audio_active
 import newpipe.shared.generated.resources.desktop_data_saver_on
@@ -594,18 +597,20 @@ fun VideoDetailScreen(
                                     snackbarHostState.showSnackbar("MP4 download started (${option.resolution})")
                                 }
                             },
-                            onDownloadMp3 = { option ->
-                                viewModel.downloadMp3(option)
+                            onDownloadMp3 = { option, bitrateKbps ->
+                                viewModel.downloadMp3(option, bitrateKbps)
                                 showDownloadDialog = false
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("MP3 download started")
+                                    snackbarHostState.showSnackbar("MP3 download started (${bitrateKbps} kbps)")
                                 }
                             },
-                            onDownloadNativeAudio = { option ->
-                                viewModel.downloadNativeAudio(option)
+                            onDownloadNativeAudio = { option, bitrateKbps ->
+                                viewModel.downloadNativeAudio(option, bitrateKbps)
                                 showDownloadDialog = false
+                                val msg = bitrateKbps?.let { "Audio download started (${it} kbps)" }
+                                    ?: "Audio download started"
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("Audio download started")
+                                    snackbarHostState.showSnackbar(msg)
                                 }
                             },
                             onDismiss = { showDownloadDialog = false }
@@ -728,7 +733,7 @@ private fun DesktopPlayerControlsBar(
                     }
                 }
 
-                if (audioStreams.size > 1) {
+                if (audioStreams.isNotEmpty()) {
                     Box {
                         TextButton(onClick = { showAudioMenu = true }) {
                             Text(
@@ -820,18 +825,22 @@ private fun DownloadMediaDialog(
     details: VideoDetails,
     ffmpegAvailable: Boolean,
     onDownloadMp4: (VideoStreamOption) -> Unit,
-    onDownloadMp3: (AudioStreamOption) -> Unit,
-    onDownloadNativeAudio: (AudioStreamOption) -> Unit,
+    onDownloadMp3: (AudioStreamOption, Int) -> Unit,
+    onDownloadNativeAudio: (AudioStreamOption, Int?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedMode by remember { mutableStateOf(DownloadFormat.MP4) }
-    val orderedVideos = remember(details.videoStreams) {
-        details.videoStreams.sortedByDescending { it.formatKey == "MPEG_4" }
+    val orderedVideos = remember(details.videoStreams, ffmpegAvailable) {
+        DesktopDownloadOptionsHelper.buildVideoDownloadOptions(details.videoStreams, ffmpegAvailable)
     }
     var selectedVideo by remember(orderedVideos) { mutableStateOf(orderedVideos.firstOrNull()) }
     var selectedAudio by remember(details.audioStreams) {
-        mutableStateOf(details.audioStreams.firstOrNull())
+        mutableStateOf(
+            details.audioStreams.maxByOrNull { it.bitrateKbps } ?: details.audioStreams.firstOrNull()
+        )
     }
+    var selectedAudioBitrateKbps by remember { mutableStateOf(128) }
+    var useCustomAudioBitrate by remember(ffmpegAvailable) { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -840,7 +849,7 @@ private fun DownloadMediaDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 420.dp)
+                    .heightIn(max = 460.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -896,51 +905,151 @@ private fun DownloadMediaDialog(
 
                 HorizontalDivider()
 
-                if (selectedMode == DownloadFormat.MP4) {
-                    Text(
-                        text = stringResource(Res.string.desktop_resolution),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    orderedVideos.forEach { option ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedVideo = option }
-                        ) {
-                            RadioButton(
-                                selected = selectedVideo?.id == option.id,
-                                onClick = { selectedVideo = option }
-                            )
-                            val muxTag = if (option.isVideoOnly) "DASH + audio mux" else "Direct"
-                            Text(
-                                text = "${option.resolution} • ${option.formatLabel} ($muxTag)",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                when (selectedMode) {
+                    DownloadFormat.MP4 -> {
+                        Text(
+                            text = stringResource(Res.string.desktop_resolution),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        orderedVideos.forEach { option ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedVideo = option }
+                            ) {
+                                RadioButton(
+                                    selected = selectedVideo?.id == option.id,
+                                    onClick = { selectedVideo = option }
+                                )
+                                val muxTag = when {
+                                    option.targetScaleHeight != null -> "FFmpeg"
+                                    option.formatKey == "HLS" -> "HLS"
+                                    option.isVideoOnly -> "DASH + audio mux"
+                                    else -> "Direct"
+                                }
+                                Text(
+                                    text = "${option.resolution} • ${option.formatLabel} ($muxTag)",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
                         }
                     }
-                } else {
-                    Text(
-                        text = stringResource(Res.string.desktop_audio_track),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    details.audioStreams.forEach { option ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedAudio = option }
-                        ) {
-                            RadioButton(
-                                selected = selectedAudio?.id == option.id,
-                                onClick = { selectedAudio = option }
-                            )
-                            val lang = option.localeLabel?.let { " • $it" } ?: ""
-                            val size = formatBytes(option.approxSizeBytes).takeIf { it.isNotEmpty() }?.let { " (~$it)" } ?: ""
+
+                    DownloadFormat.MP3 -> {
+                        Text(
+                            text = stringResource(Res.string.desktop_audio_bitrate),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        DesktopPreferences.AUDIO_DOWNLOAD_BITRATES_KBPS.forEach { kbps ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedAudioBitrateKbps = kbps }
+                            ) {
+                                RadioButton(
+                                    selected = selectedAudioBitrateKbps == kbps,
+                                    onClick = { selectedAudioBitrateKbps = kbps }
+                                )
+                                Text(
+                                    text = "MP3 • $kbps kbps",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                        if (details.audioStreams.distinctBy { it.localeLabel.orEmpty() }.size > 1) {
+                            HorizontalDivider()
                             Text(
-                                text = "${option.formatLabel} ${option.bitrateKbps} kbps$lang$size",
-                                style = MaterialTheme.typography.bodyMedium
+                                text = stringResource(Res.string.desktop_audio_track),
+                                style = MaterialTheme.typography.labelLarge
                             )
+                            details.audioStreams.forEach { option ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedAudio = option }
+                                ) {
+                                    RadioButton(
+                                        selected = selectedAudio?.id == option.id,
+                                        onClick = { selectedAudio = option }
+                                    )
+                                    val lang = option.localeLabel?.let { " • $it" } ?: ""
+                                    Text(
+                                        text = "${option.formatLabel} ${option.bitrateKbps} kbps$lang",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    else -> {
+                        if (ffmpegAvailable || details.audioStreams.any { it.formatKey == "M4A" && it.bitrateKbps == 128 }) {
+                            Text(
+                                text = stringResource(Res.string.desktop_audio_bitrate),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            DesktopPreferences.AUDIO_DOWNLOAD_BITRATES_KBPS.forEach { kbps ->
+                                val hasNativeMatch = details.audioStreams.any {
+                                    it.formatKey == "M4A" && it.bitrateKbps == kbps
+                                }
+                                if (ffmpegAvailable || hasNativeMatch) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                useCustomAudioBitrate = true
+                                                selectedAudioBitrateKbps = kbps
+                                            }
+                                    ) {
+                                        RadioButton(
+                                            selected = useCustomAudioBitrate && selectedAudioBitrateKbps == kbps,
+                                            onClick = {
+                                                useCustomAudioBitrate = true
+                                                selectedAudioBitrateKbps = kbps
+                                            }
+                                        )
+                                        val suffix = if (hasNativeMatch) "M4A (Direct)" else "M4A / AAC (FFmpeg)"
+                                        Text(
+                                            text = "$kbps kbps • $suffix",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                            HorizontalDivider()
+                        }
+                        Text(
+                            text = stringResource(Res.string.desktop_audio_track),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        details.audioStreams.forEach { option ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        useCustomAudioBitrate = false
+                                        selectedAudio = option
+                                    }
+                            ) {
+                                RadioButton(
+                                    selected = !useCustomAudioBitrate && selectedAudio?.id == option.id,
+                                    onClick = {
+                                        useCustomAudioBitrate = false
+                                        selectedAudio = option
+                                    }
+                                )
+                                val lang = option.localeLabel?.let { " • $it" } ?: ""
+                                val size = formatBytes(option.approxSizeBytes).takeIf { it.isNotEmpty() }?.let { " (~$it)" } ?: ""
+                                Text(
+                                    text = "${option.formatLabel} ${option.bitrateKbps} kbps$lang$size",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
                         }
                     }
                 }
@@ -950,13 +1059,17 @@ private fun DownloadMediaDialog(
             Button(
                 enabled = when (selectedMode) {
                     DownloadFormat.MP4 -> selectedVideo != null
+                    DownloadFormat.MP3 -> selectedAudio != null && ffmpegAvailable
                     else -> selectedAudio != null
                 },
                 onClick = {
                     when (selectedMode) {
                         DownloadFormat.MP4 -> selectedVideo?.let(onDownloadMp4)
-                        DownloadFormat.MP3 -> selectedAudio?.let(onDownloadMp3)
-                        else -> selectedAudio?.let(onDownloadNativeAudio)
+                        DownloadFormat.MP3 -> selectedAudio?.let { onDownloadMp3(it, selectedAudioBitrateKbps) }
+                        else -> selectedAudio?.let {
+                            val bitrate = if (useCustomAudioBitrate) selectedAudioBitrateKbps else null
+                            onDownloadNativeAudio(it, bitrate)
+                        }
                     }
                 }
             ) {
