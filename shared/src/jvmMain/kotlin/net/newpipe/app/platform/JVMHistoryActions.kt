@@ -8,4 +8,22 @@ package net.newpipe.app.platform
 import org.koin.core.annotation.Singleton
 
 @Singleton(binds = [HistoryActions::class])
-class JVMHistoryActions : HistoryActions by NoOpHistoryActions
+class JVMHistoryActions(
+    private val database: DesktopDatabaseGateway,
+    private val youTubeBackend: YouTubeBackend
+) : HistoryActions {
+
+    override fun wipeMetadataCache() {
+        youTubeBackend.clearMetadataCache()
+    }
+
+    override suspend fun clearWatchHistory(): Boolean = database.clearWatchHistory()
+
+    override suspend fun clearPlaybackStates(): Boolean = database.clearPlaybackStates()
+
+    override suspend fun clearSearchHistory(): Boolean = database.clearSearchHistory()
+
+    override fun clearRecaptchaCookies() {
+        youTubeBackend.clearRecaptchaCookies()
+    }
+}

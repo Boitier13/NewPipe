@@ -8,6 +8,13 @@ package net.newpipe.app.navigation
 import androidx.compose.runtime.mutableStateListOf
 import co.touchlab.kermit.Logger
 import net.newpipe.app.screen.about.AboutScreen
+import net.newpipe.app.screen.desktop.ChannelScreen
+import net.newpipe.app.screen.desktop.DesktopHomeSearchScreen
+import net.newpipe.app.screen.desktop.DownloadsScreen
+import net.newpipe.app.screen.desktop.HistoryScreen
+import net.newpipe.app.screen.desktop.PlaylistScreen
+import net.newpipe.app.screen.desktop.SubscriptionsScreen
+import net.newpipe.app.screen.desktop.VideoDetailScreen
 import net.newpipe.app.screen.settings.AppearanceSettingsScreen
 import net.newpipe.app.screen.settings.BackupRestoreSettingsScreen
 import net.newpipe.app.screen.settings.ContentSettingsScreen
@@ -28,12 +35,54 @@ import org.koin.plugin.module.dsl.single
 
 /**
  * Navigation module to make navigation easier with nav3
- *
- * There is currently no annotation to handle this so we are using DSL API of Koin
  */
 @OptIn(KoinExperimentalAPI::class)
 fun navModule() = module {
     single<Navigator>()
+
+    navigation<Destination.Home> {
+        DesktopHomeSearchScreen(focusSearchInitially = false)
+    }
+
+    navigation<Destination.Search> { dest ->
+        DesktopHomeSearchScreen(
+            focusSearchInitially = true,
+            initialQuery = dest.initialQuery.takeIf { it.isNotBlank() }
+        )
+    }
+
+    navigation<Destination.Subscriptions> {
+        SubscriptionsScreen()
+    }
+
+    navigation<Destination.History> {
+        HistoryScreen()
+    }
+
+    navigation<Destination.Downloads> {
+        DownloadsScreen()
+    }
+
+    navigation<Destination.VideoDetail> { dest ->
+        VideoDetailScreen(
+            videoUrl = dest.url,
+            initialTitle = dest.initialTitle
+        )
+    }
+
+    navigation<Destination.ChannelDetail> { dest ->
+        ChannelScreen(
+            channelUrl = dest.url,
+            initialName = dest.initialName
+        )
+    }
+
+    navigation<Destination.PlaylistDetail> { dest ->
+        PlaylistScreen(
+            playlistUrl = dest.url,
+            initialName = dest.initialName
+        )
+    }
 
     navigation<Destination.About> {
         AboutScreen()
@@ -104,7 +153,22 @@ class Navigator(
     /**
      * Navigates to the given destination
      */
-    fun navigateTo(destination: Destination) = backstack.add(destination)
+    fun navigateTo(destination: Destination) {
+        if (backstack.lastOrNull() != destination) {
+            backstack.add(destination)
+        }
+    }
+
+    /**
+     * Switches top-level desktop navigation rail sections cleanly.
+     */
+    fun navigateRoot(destination: Destination) {
+        backstack.clear()
+        backstack.add(Destination.Home)
+        if (destination != Destination.Home) {
+            backstack.add(destination)
+        }
+    }
 
     /**
      * Navigates to the previous entry in the backstack

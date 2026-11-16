@@ -4,18 +4,14 @@
  */
 
 plugins {
-    alias(libs.plugins.android.library)
     alias(libs.plugins.jetbrains.kotlin.multiplatform)
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.jetbrains.compose.multiplatform)
     alias(libs.plugins.koin)
     alias(libs.plugins.jetbrains.kotlinx.serialization)
-    alias(libs.plugins.about.libraries)
 }
 
-// Better than adding a third-party dependency for something as simple as this
-// https://stackoverflow.com/a/74771876/8446131
-val buildConfigGenerator by tasks.registering(Sync::class) {
+val buildConfigGenerator = tasks.register<Sync>("buildConfigGenerator") {
     val buildConfigPackage = NEWPIPE_APPLICATION_ID_NEW
     val rawClass = """
         package $buildConfigPackage
@@ -46,47 +42,6 @@ kotlin {
         )
     }
 
-    android {
-        namespace = NEWPIPE_APPLICATION_ID_NEW
-        compileSdk {
-            version = release(NEWPIPE_VERSION_SDK_COMPILE_MAJOR) {
-                minorApiLevel = NEWPIPE_VERSION_SDK_COMPILE_MINOR
-            }
-        }
-        minSdk {
-            version = release(NEWPIPE_VERSION_SDK_MIN)
-        }
-        androidResources {
-            enable = true
-        }
-
-        optimization {
-            consumerKeepRules.apply {
-                publish = true
-                file("consumer-proguard-rules.pro")
-            }
-        }
-
-        withHostTest {
-            isIncludeAndroidResources = true
-        }
-        withDeviceTestBuilder {
-            sourceSetTreeName = "test"
-        }.configure {
-            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        }
-    }
-
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "ComposeApp"
-            isStatic = true
-        }
-    }
-
     jvm()
 
     sourceSets {
@@ -111,6 +66,7 @@ kotlin {
                 implementation(libs.koin.compose.viewmodel)
                 implementation(libs.koin.annotations)
 
+                implementation(libs.coil.compose)
                 implementation(libs.russhwolf.settings.core)
                 implementation(libs.touchlab.kermit)
             }
@@ -120,40 +76,17 @@ kotlin {
             implementation(libs.jetbrains.compose.test.ui)
             implementation(libs.russhwolf.settings.test)
         }
-        androidMain.dependencies {
-            implementation(libs.jetbrains.compose.preview)
-            implementation(libs.androidx.activity)
-            implementation(libs.androidx.appcompat)
-            implementation(libs.androidx.preference)
-            implementation(libs.androidx.browser)
+        jvmMain.dependencies {
+            implementation(libs.androidx.sqlite.bundled)
+            implementation(libs.coil.network.okhttp)
+            implementation(libs.jsoup)
+            implementation(libs.newpipe.extractor)
+            implementation(libs.squareup.okhttp)
+            implementation(libs.squareup.okhttp.brotli)
+            implementation(libs.vlcj)
         }
-        val androidDeviceTest by getting {
-            dependencies {
-                implementation(libs.androidx.compose.test.ui.manifest)
-                implementation(libs.androidx.compose.test.ui.junit)
-
-                // Needed because androidx.compose.test.ui.junit pulls an older dependency
-                // which crashes on new Android versions
-                implementation(libs.androidx.test.espresso.core)
-            }
+        jvmTest.dependencies {
+            implementation(compose.desktop.currentOs)
         }
-        val jvmTest by getting {
-            dependencies {
-                implementation(compose.desktop.currentOs)
-            }
-        }
-    }
-}
-
-dependencies {
-    androidRuntimeClasspath(libs.jetbrains.compose.tooling)
-}
-
-aboutLibraries {
-    export {
-        outputFile = file("src/iosMain/resources/aboutlibraries.json")
-        prettyPrint = true
-        variant = "metadataIosMain"
-        excludeFields.addAll("organization", "scm", "funding")
     }
 }
