@@ -94,6 +94,7 @@ import newpipe.shared.generated.resources.desktop_accessibility_reload
 import newpipe.shared.generated.resources.desktop_accessibility_detect_vlc
 import newpipe.shared.generated.resources.desktop_accessibility_settings
 import newpipe.shared.generated.resources.desktop_accessibility_play
+import newpipe.shared.generated.resources.desktop_accessibility_pause
 import newpipe.shared.generated.resources.desktop_accessibility_mute
 import newpipe.shared.generated.resources.desktop_accessibility_fullscreen
 import newpipe.shared.generated.resources.desktop_audio_format
