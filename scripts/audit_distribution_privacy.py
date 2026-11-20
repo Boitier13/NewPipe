@@ -6,6 +6,7 @@ structural gate, not a claim that arbitrary secrets can be detected by their con
 """
 import argparse
 import io
+import os
 from pathlib import Path, PurePosixPath
 import sys
 import zipfile
@@ -72,6 +73,9 @@ def main():
             print(f'Privacy structure audit PASS: {path} ({count} files including nested archives)')
     except (ValueError, zipfile.BadZipFile) as error:
         print(error, file=sys.stderr)
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            detail = str(error).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+            print(f'::error::{detail}')
         return 1
     return 0
 
