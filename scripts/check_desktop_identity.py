@@ -25,6 +25,10 @@ class DesktopIdentityTests(unittest.TestCase):
                     self.assertNotIn(key, keys, f'{folder}: {key}')
                     keys.add(key)
 
+    def test_appearance_screen_imports_compose_delegate_operator(self):
+        path = ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/screen/settings/AppearanceSettingsScreen.kt'
+        self.assertIn('import androidx.compose.runtime.getValue', path.read_text())
+
     def test_desktop_copy(self):
         for locale in ('values', 'values-fr'):
             strings = {e.attrib['name']: e.text for e in ET.parse(RES / locale / 'strings.xml').getroot() if e.tag == 'string'}
