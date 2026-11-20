@@ -1,8 +1,18 @@
 # BoitierTube — compilation et validation Windows
 
+## Portée de ce guide
+
+Ce guide vise notamment **Windows 10 x64 avec Windows PowerShell 5.1** (fourni avec Windows 10).
+PowerShell 7 n’est pas requis. Le script a été relu pour cette syntaxe, mais **ni le script ni
+la compilation n’ont encore été exécutés sur Windows 10** : la compatibilité effective reste
+à confirmer. La CI `windows-latest` utilise un environnement Windows Server et ne remplace pas
+une recette Windows 10. Voir le [bilan d’audit](boitiertube-audit-windows10.md).
+
 ## Prérequis
 
-- Windows 64 bits, PowerShell, dépôt complet avec `gradlew.bat` et `gradle/wrapper`.
+- Windows 10 x64 (22H2 comme configuration de recette de référence), PowerShell 5.1 ou ultérieur,
+  dépôt complet extrait dans un dossier local, avec `gradlew.bat` et `gradle/wrapper`.
+  Utiliser PowerShell, pas l’invite `cmd.exe`, pour les commandes de ce guide.
 - **JDK 21 complet** (par exemple Temurin), avec `java`, `javac` et `jpackage`.
   Définir `JAVA_HOME` vers le dossier du JDK, pas vers son sous-dossier `bin`.
 - Accès réseau à la distribution Gradle et aux dépôts déclarés dans `settings.gradle.kts`
@@ -13,9 +23,42 @@
 - Pour les essais de lecture : VLC 64 bits. Pour les conversions MP3 et certains muxages : FFmpeg.
   VLC et FFmpeg ne sont pas nécessaires aux contrôles statiques des ressources.
 
+## Préparer une session PowerShell sur Windows 10
+
+Installer un **JDK 21 Windows x64 complet** compatible avec Windows 10, puis ouvrir une fenêtre
+PowerShell normale (pas besoin d’administrateur pour compiler). Les commandes suivantes demandent
+les vrais chemins de votre installation et de votre dépôt, et acceptent les espaces :
+
+```powershell
+$PSVersionTable.PSVersion
+$env:JAVA_HOME = (Read-Host 'Chemin complet du dossier JDK 21, sans bin').Trim('"')
+$env:Path = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:Path
+Set-Location -LiteralPath ((Read-Host 'Chemin complet du depot BoitierTube').Trim('"'))
+
+Test-Path -LiteralPath .\gradlew.bat
+Test-Path -LiteralPath .\gradle\wrapper\gradle-wrapper.jar
+& (Join-Path $env:JAVA_HOME 'bin\java.exe') --version
+& (Join-Path $env:JAVA_HOME 'bin\javac.exe') --version
+& (Join-Path $env:JAVA_HOME 'bin\jpackage.exe') --version
+```
+
+Les deux `Test-Path` doivent retourner `True` et les trois outils doivent indiquer la version 21.
+Ces variables ne sont modifiées que pour cette session PowerShell ; recommencer dans une nouvelle
+fenêtre ou configurer les variables d’environnement utilisateur via Windows.
+
+Pour les installateurs uniquement, installer WiX Toolset **3.x**, puis ajouter son dossier `bin`
+réel au PATH de cette session. Vérifier avant de lancer `-Package` :
+
+```powershell
+Get-Command candle.exe, light.exe
+```
+
+Le script ne télécharge ni Java, ni WiX, ni VLC. Un JRE seul ne suffit pas. Compiler d’abord sans
+`-Package` permet de distinguer un problème du projet d’un problème d’outillage WiX.
+
 ## Commandes
 
-Depuis la racine du dépôt :
+Depuis la racine du dépôt, dans cette même fenêtre PowerShell :
 
 ```powershell
 # Facultatif : tests de ressources sans Java, avec Python 3
@@ -45,6 +88,24 @@ ou utiliser les commandes Gradle directement. Ne pas désactiver globalement la 
 Le script retourne une erreur si un prérequis manque ou si une commande Gradle échoue ;
 il ne remplace pas une installation Java et ne masque pas les erreurs du compilateur.
 Il n’a pas pu être exécuté dans l’environnement Linux sans PowerShell/JDK de cette session.
+
+### Dépannage Windows 10
+
+| Symptôme | Contrôle / action |
+| --- | --- |
+| Exécution des scripts désactivée | Utiliser les commandes `gradlew.bat` ci-dessus ; ne pas contourner une politique d’entreprise. Le préflight peut être remplacé par les commandes de contrôle du JDK et des fichiers décrites plus haut. |
+| `JAVA_HOME` invalide ou outil absent | Choisir la racine d’un JDK 21 complet x64, pas `bin`, pas un JRE ; vérifier les trois versions. |
+| `gradlew.bat` introuvable | Revenir à la racine du dépôt ; ne pas lancer depuis `doc` ou `scripts`. |
+| `candle.exe` / `light.exe` introuvables | Vérifier l’installation WiX 3.x et le PATH dans la même session ; Java seul ne permet pas le packaging MSI/EXE. |
+| Échec de téléchargement, certificat, plugin ou dépendance introuvable | Conserver l’erreur exacte et vérifier réseau/proxy/certificats ainsi que la disponibilité des versions épinglées. Ne pas désactiver TLS ou changer les versions à l’aveugle. |
+| Alias Python ouvrant le Store | Ce contrôle est facultatif pour la compilation ; installer Python 3 ou utiliser `py -3 scripts/check_desktop_identity.py` si le lanceur Python est installé. |
+| Pas d’image/son après un build réussi | Vérifier VLC 64 bits et son chemin dans les paramètres ; vérifier séparément FFmpeg pour MP3/muxage. |
+
+Les sorties attendues se trouvent dans `desktopApp\build\compose\binaries\main\` :
+`app\` pour la distribution, `msi\` et `exe\` pour les installateurs.
+Tester le raccourci et l’exécutable **installés**, pas seulement `gradlew run`, pour vérifier
+l’icône de la barre des tâches. Pour le mode Système sur Windows 10 : Paramètres → Personnalisation
+→ Couleurs → choisir le mode d’application clair/sombre (le mode Windows seul peut différer).
 
 La CI Windows existante a été adaptée pour contrôler les ressources, construire et tester,
 puis générer et conserver les deux installateurs sous `boitiertube-windows`.
