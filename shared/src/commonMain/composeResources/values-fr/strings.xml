@@ -64,7 +64,7 @@
     <string name="cancel">Annuler</string>
     <string name="delete_view_history_alert">Supprimer tout l'historique de visionnage ?</string>
 
-    <!-- Interface de bureau -->
+    <!-- Desktop UI -->
     <string name="desktop_nav_explore">Explorer</string>
     <string name="desktop_nav_search">Rechercher</string>
     <string name="desktop_nav_subscriptions">Abonnements</string>
@@ -121,24 +121,23 @@
     <string name="desktop_import_subscriptions_title">Importer vos abonnements YouTube</string>
     <string name="desktop_import_subscriptions_desc">Pour protéger votre vie privée et la sécurité de votre compte, BoitierTube ne se connecte pas directement à Google. Pour retrouver vos abonnements YouTube ici :\n\n1. Ouvrez takeout.google.com et exportez YouTube → abonnements (subscriptions.csv), ou utilisez un fichier d'abonnements NewPipe (subscriptions.json).\n2. Cliquez sur Choisir un fichier ci-dessous pour importer vos chaînes localement.</string>
     <string name="desktop_choose_file">Choisir un fichier…</string>
-    <string name="desktop_accessibility_play">Lire</string>
-    <string name="desktop_accessibility_cancel">Annuler le téléchargement</string>
-    <string name="desktop_accessibility_remove">Retirer de la liste</string>
-    <string name="desktop_accessibility_delete">Supprimer</string>
-    <string name="desktop_accessibility_back">Retour</string>
-    <string name="desktop_accessibility_refresh">Actualiser</string>
-    <string name="desktop_accessibility_reload">Recharger</string>
-
-    <string name="desktop_accessibility_pause">Mettre en pause</string>
-    <string name="desktop_accessibility_mute">Couper ou rétablir le son</string>
-    <string name="desktop_accessibility_fullscreen">Plein écran</string>
-    <string name="desktop_accessibility_stop">Arrêter la lecture</string>
-    <string name="desktop_accessibility_resume">Reprendre à %1$s</string>
-    <string name="desktop_accessibility_settings">Paramètres</string>
-    <string name="desktop_accessibility_detect_vlc">Détecter VLC à nouveau</string>
-    <string name="desktop_accessibility_clear">Effacer le texte</string>
-    <string name="desktop_accessibility_search">Rechercher</string>
-    <string name="desktop_accessibility_remove_item">Retirer cet élément</string>
-    <string name="desktop_accessibility_unsubscribe">Se désabonner</string>
     <string name="desktop_import_subscriptions_success">%1$d abonnement(s) importé(s).</string>
+<string name="desktop_accessibility_play">Lire</string>
+<string name="desktop_accessibility_cancel">Annuler le téléchargement</string>
+<string name="desktop_accessibility_remove">Retirer de la liste</string>
+<string name="desktop_accessibility_delete">Supprimer</string>
+<string name="desktop_accessibility_back">Retour</string>
+<string name="desktop_accessibility_refresh">Actualiser</string>
+<string name="desktop_accessibility_reload">Recharger</string>
+<string name="desktop_accessibility_pause">Mettre en pause</string>
+<string name="desktop_accessibility_mute">Couper ou rétablir le son</string>
+<string name="desktop_accessibility_fullscreen">Plein écran</string>
+<string name="desktop_accessibility_stop">Arrêter la lecture</string>
+<string name="desktop_accessibility_resume">Reprendre à %1$s</string>
+<string name="desktop_accessibility_settings">Paramètres</string>
+<string name="desktop_accessibility_detect_vlc">Détecter VLC à nouveau</string>
+<string name="desktop_accessibility_clear">Effacer le texte</string>
+<string name="desktop_accessibility_search">Rechercher</string>
+<string name="desktop_accessibility_remove_item">Retirer cet élément</string>
+<string name="desktop_accessibility_unsubscribe">Se désabonner</string>
 </resources>
