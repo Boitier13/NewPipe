@@ -184,3 +184,23 @@ Aucune exécution distante n’a été déclenchée ni déclarée réussie.
 Les menus et dialogues natifs AWT/Swing peuvent suivre le style de Windows plutôt que les
 couleurs Compose. Les images des vidéos et les logos des services tiers ne sont pas recolorés.
 Les surfaces vidéo noires et les voiles noirs translucides restent intentionnels.
+
+
+## Résultat de l’audit final et distribution sans installation
+
+Voir [l’audit final](boitiertube-audit-final.md) pour le SHA réellement testé, les défauts corrigés,
+les limites restantes et les liens des installateurs et du ZIP. La CI publie désormais aussi
+`boitiertube-windows-portable` : extraire le ZIP **entier** et lancer `BoitierTube.exe` dans son dossier.
+Ne pas déplacer l’EXE seul. Les données restent dans le profil Windows et Java Preferences :
+ce n’est pas un mode données isolées sur clé USB. Tester sur un profil de recette avant toute
+utilisation importante ; ne pas confondre le succès CI Windows Server avec une recette Windows 10.
+
+Contrôles supplémentaires sans Java :
+
+```powershell
+python scripts/check_final_audit.py
+```
+
+Le script de préparation limite maintenant sa sortie au dossier généré du dépôt et refuse les
+ancêtres liés. `-ValidatePathsOnly` permet de vérifier ce chemin sans télécharger, créer ou nettoyer
+de fichiers ; il ne valide ni Java, ni WiX, ni les binaires.
