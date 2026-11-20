@@ -67,10 +67,10 @@ fun main() {
             if (!isExiting && SystemTray.isSupported() && appIcon != null) {
                 Tray(
                     icon = appIcon,
-                    tooltip = "NewPipe Desktop",
+                    tooltip = "BoitierTube",
                     onAction = { isWindowVisible = true },
                     menu = {
-                        Item("Show NewPipe", onClick = { isWindowVisible = true })
+                        Item("Afficher BoitierTube", onClick = { isWindowVisible = true })
                         Item(
                             "Play / Pause",
                             onClick = { appController?.togglePlayPause?.invoke() }
@@ -80,7 +80,7 @@ fun main() {
                             onClick = { appController?.stopPlayback?.invoke() }
                         )
                         Separator()
-                        Item("Quit NewPipe", onClick = shutdownApp)
+                        Item("Quitter BoitierTube", onClick = shutdownApp)
                     }
                 )
             }
@@ -90,7 +90,7 @@ fun main() {
             Window(
                 visible = isWindowVisible,
                 onCloseRequest = handleWindowClose,
-                title = "NewPipe Desktop",
+                title = "BoitierTube",
                 icon = appIcon,
                 state = windowState
             ) {
@@ -104,7 +104,7 @@ fun main() {
             }
         }
     } catch (t: Throwable) {
-        System.err.println("NewPipe Desktop terminated unexpectedly: ${t.message}")
+        System.err.println("BoitierTube terminated unexpectedly: ${t.message}")
         t.printStackTrace(System.err)
         runCatching { controllerRef?.release?.invoke() }
         exitProcess(1)
