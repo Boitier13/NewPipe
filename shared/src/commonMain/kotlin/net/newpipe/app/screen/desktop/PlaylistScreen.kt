@@ -40,6 +40,7 @@ import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.viewmodel.desktop.PlaylistViewModel
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.desktop_accessibility_back
 import newpipe.shared.generated.resources.desktop_load_more
 import newpipe.shared.generated.resources.ic_arrow_back
 import newpipe.shared.generated.resources.desktop_retry
