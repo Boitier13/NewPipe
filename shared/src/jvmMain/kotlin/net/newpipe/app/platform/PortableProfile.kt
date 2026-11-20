@@ -15,12 +15,21 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /** Explicit opt-in only. No profile discovery, automatic copy or fallback to installed data. */
 object PortableProfile {
-    fun dataDirectory(root: String? = System.getenv("BOITIERTUBE_PORTABLE_ROOT")): File? {
+    fun dataDirectory(
+        root: String? = System.getenv("BOITIERTUBE_PORTABLE_ROOT"),
+        userHome: String = System.getProperty("user.home"),
+        userName: String = System.getProperty("user.name")
+    ): File? {
         if (root == null) return null
         require(root.isNotBlank()) { "Le chemin du profil portable est vide." }
         val directory = File(root)
         require(directory.isAbsolute && directory.isDirectory) { "Le dossier portable doit être un dossier absolu existant." }
-        return File(directory.canonicalFile, "data").also {
+        // No legacy data/ discovery or migration. Separate accounts even on a shared USB folder.
+        require(userHome.isNotBlank() && userName.isNotBlank()) { "Impossible d’identifier le profil utilisateur." }
+        val identity = File(userHome).canonicalPath + "\u0000" + userName
+        val account = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 255) }
+        return File(directory.canonicalFile, "data/profiles/$account").also {
             check(it.canonicalFile.toPath().startsWith(directory.canonicalFile.toPath())) { "Le dossier data ne doit pas sortir du profil portable." }
             Files.createDirectories(it.toPath())
             check(it.isDirectory && it.canWrite()) { "Le profil portable est inaccessible : ${it.absolutePath}" }
@@ -45,7 +54,7 @@ internal class PortableFilePreferences(private val file: File, private val befor
     private val lockChannel = FileChannel.open(PortableProfile.resolve(file.parentFile, ".portable-profile.lock").toPath(),
         StandardOpenOption.CREATE, StandardOpenOption.WRITE)
     private val sessionLock = try {
-        checkNotNull(lockChannel.tryLock()) { "Ce profil portable est déjà ouvert dans une autre instance." }
+        checkNotNull(lockChannel.tryLock()) { "Ce profil BoitierTube est déjà ouvert dans une autre instance." }
     } catch (error: Exception) { lockChannel.close(); throw error }
     private var values: Map<String, String> = try { load() } catch (error: Exception) {
         sessionLock.release(); lockChannel.close(); throw error
@@ -58,11 +67,11 @@ internal class PortableFilePreferences(private val file: File, private val befor
 
     private fun load(): Map<String, String> {
         if (!file.exists()) return emptyMap()
-        check(file.length() in 66..(4L * 1024 * 1024)) { "Le fichier des paramètres portables est incomplet ou trop volumineux." }
+        check(file.length() in 66..(4L * 1024 * 1024)) { "Le fichier des paramètres BoitierTube est incomplet ou trop volumineux." }
         val bytes = file.readBytes()
-        check(bytes[64] == '\n'.code.toByte()) { "Format de paramètres portables invalide." }
+        check(bytes[64] == '\n'.code.toByte()) { "Format de paramètres BoitierTube invalide." }
         val body = bytes.copyOfRange(65, bytes.size)
-        check(bytes.copyOfRange(0, 64).decodeToString() == digest(body)) { "Les paramètres portables sont endommagés." }
+        check(bytes.copyOfRange(0, 64).decodeToString() == digest(body)) { "Les paramètres BoitierTube sont endommagés." }
         val parsed = Json.parseToJsonElement(body.decodeToString(throwOnInvalidSequence = true)) as JsonObject
         check(parsed.size <= 4096)
         return parsed.mapValues { (key, value) ->
@@ -73,7 +82,7 @@ internal class PortableFilePreferences(private val file: File, private val befor
 
     private fun persist(next: Map<String, String>) {
         val bytes = JsonObject(next.mapValues { JsonPrimitive(it.value) }).toString().toByteArray(Charsets.UTF_8)
-        check(bytes.size <= 4 * 1024 * 1024) { "Les paramètres portables dépassent la taille autorisée." }
+        check(bytes.size <= 4 * 1024 * 1024) { "Les paramètres BoitierTube dépassent la taille autorisée." }
         val temp = Files.createTempFile(file.parentFile.toPath(), ".preferences-", ".staged")
         FileChannel.open(temp, StandardOpenOption.WRITE).use { channel ->
             val buffer = java.nio.ByteBuffer.wrap((digest(bytes) + "\n").toByteArray(Charsets.US_ASCII) + bytes)

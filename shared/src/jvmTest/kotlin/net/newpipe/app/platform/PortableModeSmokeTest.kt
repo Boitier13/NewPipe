@@ -15,7 +15,8 @@ class PortableModeSmokeTest {
     @Test
     fun explicitPortableProcessKeepsDefaultPathsAndPreferencesInsideItsRoot() {
         val root = System.getenv("BOITIERTUBE_PORTABLE_ROOT") ?: return
-        val data = File(root, "data").canonicalFile
+        val data = PortableProfile.dataDirectory(root)!!.canonicalFile
+        assertTrue(data.toPath().startsWith(File(root, "data/profiles").canonicalFile.toPath()))
         assertEquals(data, WindowsAppPaths.appDataDir().canonicalFile)
         for (file in listOf(WindowsAppPaths.databaseFile(), WindowsAppPaths.downloadLogFile(),
             WindowsAppPaths.tempDownloadDir())) {

@@ -26,13 +26,13 @@ object WindowsAppPaths {
         val dir = if (isWindows) {
             val appData = System.getenv("APPDATA")?.takeIf { it.isNotBlank() }
                 ?: File(System.getProperty("user.home"), "AppData/Roaming").absolutePath
-            File(appData, "NewPipeDesktop")
+            File(appData, "BoitierTube")
         } else {
             val os = System.getProperty("os.name").orEmpty().lowercase()
             if (os.contains("mac")) {
-                File(System.getProperty("user.home"), "Library/Application Support/NewPipeDesktop")
+                File(System.getProperty("user.home"), "Library/Application Support/BoitierTube")
             } else {
-                File(System.getProperty("user.home"), ".local/share/NewPipeDesktop")
+                File(System.getProperty("user.home"), ".local/share/BoitierTube")
             }
         }
         if (!dir.exists()) {

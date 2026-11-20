@@ -102,7 +102,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $expected = @{ DesktopBackupStoreTest = 19; DesktopRecoveryJournalTest = 4; PortableProfileTest = 8; DesktopDownloaderCookieTest = 4; PostWindowsDownloadTest = 5; PostWindowsSubscriptionsTest = 2; PlaybackStartupTimingTest = 1; FinalDownloadAuditTest = 3 }
+          $expected = @{ DesktopBackupStoreTest = 19; DesktopRecoveryJournalTest = 4; PortableProfileTest = 8; DesktopDownloaderCookieTest = 4; PostWindowsDownloadTest = 5; PostWindowsSubscriptionsTest = 2; PlaybackStartupTimingTest = 1; FinalDownloadAuditTest = 3; ProfilePrivacyTest = 1 }
           foreach ($name in $expected.Keys) {
             $path = "shared/build/full-jvm-test-results/TEST-net.newpipe.app.platform.$name.xml"
             [xml]$report = Get-Content $path -Raw
@@ -181,6 +181,35 @@ jobs:
           ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.PortableModeSmokeTest" --rerun-tasks
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:BOITIERTUBE_PORTABLE_ROOT = $null
+
+      - name: Verify clean installed and portable profiles with legacy canaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:BOITIERTUBE_PRIVACY_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('privacy-' + [guid]::NewGuid().ToString('N'))
+          $oldAppData = $env:APPDATA
+          $env:APPDATA = Join-Path $env:BOITIERTUBE_PRIVACY_TEST_ROOT 'roaming'
+          New-Item -ItemType Directory -Path $env:APPDATA -Force | Out-Null
+          try {
+            foreach ($mode in @('installed', 'portable')) {
+              $env:BOITIERTUBE_PORTABLE_ROOT = $null
+              if ($mode -eq 'portable') {
+                $env:BOITIERTUBE_PORTABLE_ROOT = Join-Path $env:BOITIERTUBE_PRIVACY_TEST_ROOT 'portable'
+                New-Item -ItemType Directory -Path $env:BOITIERTUBE_PORTABLE_ROOT -Force | Out-Null
+              }
+              foreach ($phase in @('fresh', 'reopen')) {
+                $env:BOITIERTUBE_PRIVACY_PHASE = $phase
+                ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.PrivacyProfileSmokeTest" --rerun-tasks
+                if ($LASTEXITCODE -ne 0) { throw "Profile privacy failed: $mode / $phase" }
+                Copy-Item shared/build/test-results/jvmTest "shared/build/privacy-$mode-$phase" -Recurse
+              }
+            }
+          } finally {
+            $env:APPDATA = $oldAppData
+            $env:BOITIERTUBE_PORTABLE_ROOT = $null
+            $env:BOITIERTUBE_PRIVACY_TEST_ROOT = $null
+            $env:BOITIERTUBE_PRIVACY_PHASE = $null
+          }
 
       - name: Package Windows MSI and EXE installers
         shell: pwsh
@@ -265,6 +294,7 @@ jobs:
           path: |
             shared/build/test-results/**
             shared/build/full-jvm-test-results/**
+            shared/build/privacy-*/**
             shared/build/reports/tests/**
             desktopApp/build/test-results/**
             desktopApp/build/reports/tests/**

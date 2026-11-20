@@ -11,18 +11,16 @@ import com.russhwolf.settings.Settings
 import java.io.Flushable
 import java.util.prefs.Preferences
 import org.koin.core.annotation.Singleton
-import net.newpipe.app.platform.PortableProfile
+import net.newpipe.app.platform.WindowsAppPaths
 import net.newpipe.app.platform.PortableFilePreferences
 import java.io.File
 
 /**
- * Settings for JVM devices based on Java Preferences
+ * Isolated BoitierTube settings. Never open the legacy Java Preferences root.
  */
 @Singleton
 fun provideSettings(): Settings {
-    val portable = PortableProfile.dataDirectory()
-    val preferences = if (portable == null) Preferences.userRoot()
-        else PortableFilePreferences(File(portable, "preferences.checked-json"))
+    val preferences = PortableFilePreferences(File(WindowsAppPaths.appDataDir(), "preferences.checked-json"))
     return DurablePreferencesSettings(preferences)
 }
 
