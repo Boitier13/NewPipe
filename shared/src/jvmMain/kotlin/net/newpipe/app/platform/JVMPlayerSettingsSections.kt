@@ -18,6 +18,27 @@ import net.newpipe.app.composable.ListPreferenceEntry
 import net.newpipe.app.composable.PreferenceCategoryTitle
 import net.newpipe.app.composable.SwitchPreference
 import net.newpipe.app.preferences.DesktopPreferences
+import org.jetbrains.compose.resources.stringResource
+import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.desktop_runtime_data_saver_desktop
+import newpipe.shared.generated.resources.desktop_runtime_data_saver_mode
+import newpipe.shared.generated.resources.desktop_runtime_data_saver_summary
+import newpipe.shared.generated.resources.desktop_runtime_data_saver_resolution
+import newpipe.shared.generated.resources.desktop_runtime_data_saver_audio
+import newpipe.shared.generated.resources.desktop_runtime_data_saver_audio_summary
+import newpipe.shared.generated.resources.desktop_runtime_windows_runtimes
+import newpipe.shared.generated.resources.desktop_runtime_vlc_folder
+import newpipe.shared.generated.resources.desktop_runtime_auto_bundled
+import newpipe.shared.generated.resources.desktop_runtime_auto_vlc
+import newpipe.shared.generated.resources.desktop_runtime_vlc_detected
+import newpipe.shared.generated.resources.desktop_runtime_vlc_missing
+import newpipe.shared.generated.resources.desktop_runtime_ffmpeg_path
+import newpipe.shared.generated.resources.desktop_runtime_auto_path
+import newpipe.shared.generated.resources.desktop_runtime_ffmpeg_detected
+import newpipe.shared.generated.resources.desktop_runtime_ffmpeg_missing
+import newpipe.shared.generated.resources.desktop_runtime_mp3_bitrate
+import newpipe.shared.generated.resources.desktop_runtime_tray_audio
+import newpipe.shared.generated.resources.desktop_runtime_tray_audio_summary
 import org.koin.core.annotation.Singleton
 
 @Singleton(binds = [PlayerSettingsSections::class])
@@ -56,23 +77,23 @@ class JVMPlayerSettingsSections(
         }
         var ffmpegFound by remember { mutableStateOf(downloadController.isFfmpegAvailable()) }
 
-        PreferenceCategoryTitle(title = "Data Saver (Desktop)")
+        PreferenceCategoryTitle(title = stringResource(Res.string.desktop_runtime_data_saver_desktop))
         SwitchPreference(
-            title = "Data Saver mode",
-            summary = "Limit playback resolution, download low-bitrate audio, and lower thumbnail quality",
+            title = stringResource(Res.string.desktop_runtime_data_saver_mode),
+            summary = stringResource(Res.string.desktop_runtime_data_saver_summary),
             checked = isDataSaver,
             onCheckedChange = dataSaverController::setDataSaverEnabled
         )
         ListPreference(
-            title = "Data Saver max resolution",
+            title = stringResource(Res.string.desktop_runtime_data_saver_resolution),
             entries = DesktopPreferences.DATA_SAVER_RESOLUTION_OPTIONS.map { ListPreferenceEntry(it, it) },
             selectedValue = dataSaverMaxRes,
             onValueSelected = dataSaverController::setMaxResolution,
             enabled = isDataSaver
         )
         SwitchPreference(
-            title = "Prefer audio-only playback in Data Saver",
-            summary = "Start streams in background audio mode when Data Saver is active",
+            title = stringResource(Res.string.desktop_runtime_data_saver_audio),
+            summary = stringResource(Res.string.desktop_runtime_data_saver_audio_summary),
             checked = dataSaverAudioOnly,
             onCheckedChange = dataSaverController::setPreferAudioOnly,
             enabled = isDataSaver
@@ -81,19 +102,19 @@ class JVMPlayerSettingsSections(
         val hasBundledVlc = remember { WindowsAppPaths.bundledVlcDirectory() != null }
         val hasBundledFfmpeg = remember { WindowsAppPaths.bundledFfmpegExecutable() != null }
 
-        PreferenceCategoryTitle(title = "Windows Desktop (VLC & FFmpeg)")
+        PreferenceCategoryTitle(title = stringResource(Res.string.desktop_runtime_windows_runtimes))
         EditTextPreference(
-            title = "VLC / libVLC folder path",
+            title = stringResource(Res.string.desktop_runtime_vlc_folder),
             value = vlcPath,
             summary = buildString {
                 append(
                     when {
                         vlcPath.isNotBlank() -> vlcPath
-                        hasBundledVlc -> "Auto-detect (bundled)"
-                        else -> "Auto-detect (Program Files\\VideoLAN\\VLC)"
+                        hasBundledVlc -> stringResource(Res.string.desktop_runtime_auto_bundled)
+                        else -> stringResource(Res.string.desktop_runtime_auto_vlc)
                     }
                 )
-                append(if (playerState.vlcAvailable) " — VLC detected" else " — VLC not found")
+                append(if (playerState.vlcAvailable) stringResource(Res.string.desktop_runtime_vlc_detected) else stringResource(Res.string.desktop_runtime_vlc_missing))
             },
             onValueChange = { newPath ->
                 val trimmed = newPath.trim()
@@ -103,17 +124,17 @@ class JVMPlayerSettingsSections(
             }
         )
         EditTextPreference(
-            title = "FFmpeg executable path (for MP3 & video muxing)",
+            title = stringResource(Res.string.desktop_runtime_ffmpeg_path),
             value = ffmpegPath,
             summary = buildString {
                 append(
                     when {
                         ffmpegPath.isNotBlank() -> ffmpegPath
-                        hasBundledFfmpeg -> "Auto-detect (bundled)"
-                        else -> "Auto-detect on PATH / winget"
+                        hasBundledFfmpeg -> stringResource(Res.string.desktop_runtime_auto_bundled)
+                        else -> stringResource(Res.string.desktop_runtime_auto_path)
                     }
                 )
-                append(if (ffmpegFound) " — FFmpeg detected" else " — FFmpeg not found")
+                append(if (ffmpegFound) stringResource(Res.string.desktop_runtime_ffmpeg_detected) else stringResource(Res.string.desktop_runtime_ffmpeg_missing))
             },
             onValueChange = { newPath ->
                 val trimmed = newPath.trim()
@@ -123,7 +144,7 @@ class JVMPlayerSettingsSections(
             }
         )
         ListPreference(
-            title = "MP3 download bitrate",
+            title = stringResource(Res.string.desktop_runtime_mp3_bitrate),
             entries = DesktopPreferences.MP3_BITRATE_OPTIONS.map { ListPreferenceEntry(it, it) },
             selectedValue = mp3Bitrate,
             onValueSelected = { bitrate ->
@@ -132,8 +153,8 @@ class JVMPlayerSettingsSections(
             }
         )
         SwitchPreference(
-            title = "Minimize to system tray during background audio",
-            summary = "Keep audio playing in the Windows notification area when closing/minimizing",
+            title = stringResource(Res.string.desktop_runtime_tray_audio),
+            summary = stringResource(Res.string.desktop_runtime_tray_audio_summary),
             checked = minimizeToTray,
             onCheckedChange = { checked ->
                 minimizeToTray = checked

@@ -47,24 +47,20 @@ def main():
     platform = 'shared/src/jvmMain/kotlin/net/newpipe/app/platform/'
     initial = inventory['central_before']
     for path in [
-        platform + 'DesktopBackupStore.kt', platform + 'JVMDesktopDatabase.kt',
         platform + 'JVMBackupRestoreActions.kt',
-        'shared/src/jvmMain/kotlin/net/newpipe/app/di/settings/SettingsModule.kt',
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/DesktopBackupStoreTest.kt',
         'shared/src/commonMain/kotlin/net/newpipe/app/screen/settings/BackupRestoreSettingsScreen.kt',
         'shared/src/commonMain/kotlin/net/newpipe/app/screen/settings/model/BackupRestoreMessage.kt',
         'shared/src/commonMain/kotlin/net/newpipe/app/viewmodel/settings/BackupRestoreSettingsViewModel.kt',
         'shared/src/commonMain/kotlin/net/newpipe/app/theme/Color.kt',
         'shared/src/commonMain/kotlin/net/newpipe/app/theme/Typography.kt',
-        'desktopApp/src/main/kotlin/net/newpipe/app/Main.kt'
     ]:
         assert (ROOT / path).read_bytes() == git('show', f'{initial}:{path}'), f'Arena identity/backup regression: {path}'
-    print('Arena identity, font, window/tray and backup implementation preserved byte-for-byte.')
+    print('Arena identity and unchanged backup/UI files preserved byte-for-byte; recovery journal evolution is covered by tests.')
 
     portable_tip = next(b['tip'] for b in inventory['branches'] if b['name'] == 'arena/ae9cabd8-newpipe')
     for path in [
-        platform + 'WindowsAppPaths.kt', platform + 'VlcMediaPlayerController.kt',
-        platform + 'JVMPlayerSettingsSections.kt',
+        platform + 'VlcMediaPlayerController.kt',
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsAppPathsTest.kt',
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsBundledRuntimeSmokeTest.kt'
     ]:

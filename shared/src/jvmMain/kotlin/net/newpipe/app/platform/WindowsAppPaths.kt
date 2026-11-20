@@ -21,6 +21,8 @@ object WindowsAppPaths {
         get() = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
 
     fun appDataDir(): File {
+        val portable = PortableProfile.dataDirectory()
+        if (portable != null) return portable
         val dir = if (isWindows) {
             val appData = System.getenv("APPDATA")?.takeIf { it.isNotBlank() }
                 ?: File(System.getProperty("user.home"), "AppData/Roaming").absolutePath
@@ -44,7 +46,8 @@ object WindowsAppPaths {
     fun downloadLogFile(): File = File(appDataDir(), "download_mux.log")
 
     fun defaultVideoDownloadDir(): File {
-        val dir = File(System.getProperty("user.home"), "Downloads/NewPipe/Video")
+        val dir = PortableProfile.dataDirectory()?.let { File(it, "downloads/Video") }
+            ?: File(System.getProperty("user.home"), "Downloads/NewPipe/Video")
         if (!dir.exists()) {
             dir.mkdirs()
         }
@@ -52,7 +55,8 @@ object WindowsAppPaths {
     }
 
     fun defaultAudioDownloadDir(): File {
-        val dir = File(System.getProperty("user.home"), "Downloads/NewPipe/Audio")
+        val dir = PortableProfile.dataDirectory()?.let { File(it, "downloads/Audio") }
+            ?: File(System.getProperty("user.home"), "Downloads/NewPipe/Audio")
         if (!dir.exists()) {
             dir.mkdirs()
         }

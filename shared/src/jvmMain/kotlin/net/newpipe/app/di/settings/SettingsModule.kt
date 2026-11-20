@@ -11,12 +11,20 @@ import com.russhwolf.settings.Settings
 import java.io.Flushable
 import java.util.prefs.Preferences
 import org.koin.core.annotation.Singleton
+import net.newpipe.app.platform.PortableProfile
+import net.newpipe.app.platform.PortableFilePreferences
+import java.io.File
 
 /**
  * Settings for JVM devices based on Java Preferences
  */
 @Singleton
-fun provideSettings(): Settings = DurablePreferencesSettings(Preferences.userRoot())
+fun provideSettings(): Settings {
+    val portable = PortableProfile.dataDirectory()
+    val preferences = if (portable == null) Preferences.userRoot()
+        else PortableFilePreferences(File(portable, "preferences.checked-json"))
+    return DurablePreferencesSettings(preferences)
+}
 
 /** Keep observable behavior while allowing backup transactions to detect persistence failures. */
 internal class DurablePreferencesSettings(

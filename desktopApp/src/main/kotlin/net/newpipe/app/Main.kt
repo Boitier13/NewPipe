@@ -18,6 +18,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.awt.SystemTray
 import javax.imageio.ImageIO
+import javax.swing.JOptionPane
+import net.newpipe.app.platform.verifyDesktopRecoveryState
 import kotlin.system.exitProcess
 import net.newpipe.app.platform.DesktopStreamMuxerRegistry
 
@@ -36,6 +38,12 @@ fun main() {
     }
 
     try {
+        try {
+            verifyDesktopRecoveryState()
+        } catch (failure: Exception) {
+            JOptionPane.showMessageDialog(null, failure.message, "Récupération BoitierTube", JOptionPane.ERROR_MESSAGE)
+            return
+        }
         application {
             var isWindowVisible by remember { mutableStateOf(true) }
             var isExiting by remember { mutableStateOf(false) }

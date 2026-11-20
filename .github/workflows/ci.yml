@@ -85,6 +85,10 @@ jobs:
             exit $code
           }
 
+      - name: Preserve complete JVM test results
+        shell: pwsh
+        run: Copy-Item shared/build/test-results/jvmTest shared/build/full-jvm-test-results -Recurse
+
       - name: Run desktopApp checks
         shell: pwsh
         run: |
@@ -143,6 +147,16 @@ jobs:
             exit $code
           }
 
+      - name: Verify isolated portable process
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:BOITIERTUBE_PORTABLE_ROOT = Join-Path $env:RUNNER_TEMP ('portable-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $env:BOITIERTUBE_PORTABLE_ROOT | Out-Null
+          ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.PortableModeSmokeTest" --rerun-tasks
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:BOITIERTUBE_PORTABLE_ROOT = $null
+
       - name: Package Windows MSI and EXE installers
         shell: pwsh
         run: |
@@ -182,6 +196,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $appDir = "desktopApp/build/compose/binaries/main/app/BoitierTube"
           if (-not (Test-Path "$appDir/BoitierTube.exe")) { throw "Missing distribution launcher" }
+          Copy-Item scripts/Start-BoitierTube-Portable.cmd "$appDir/Start-BoitierTube-Portable.cmd"
+          Copy-Item doc/boitiertube-portable.md "$appDir/PORTABLE.md"
           Compress-Archive -Path $appDir -DestinationPath "desktopApp/build/BoitierTube-windows-x64.zip"
           Get-FileHash "desktopApp/build/BoitierTube-windows-x64.zip" -Algorithm SHA256 | Format-List
 
@@ -200,6 +216,7 @@ jobs:
           if-no-files-found: warn
           path: |
             shared/build/test-results/**
+            shared/build/full-jvm-test-results/**
             shared/build/reports/tests/**
             desktopApp/build/test-results/**
             desktopApp/build/reports/tests/**

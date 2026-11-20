@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="desktop_runtime_data_saver_desktop">Data Saver (Desktop)</string>
+    <string name="desktop_runtime_data_saver_mode">Data Saver mode</string>
+    <string name="desktop_runtime_data_saver_summary">Limit playback resolution, download low-bitrate audio, and lower thumbnail quality</string>
+    <string name="desktop_runtime_data_saver_resolution">Data Saver max resolution</string>
+    <string name="desktop_runtime_data_saver_audio">Prefer audio-only playback in Data Saver</string>
+    <string name="desktop_runtime_data_saver_audio_summary">Start streams in background audio mode when Data Saver is active</string>
+    <string name="desktop_runtime_windows_runtimes">Windows Desktop (VLC &amp; FFmpeg)</string>
+    <string name="desktop_runtime_vlc_folder">VLC / libVLC folder path</string>
+    <string name="desktop_runtime_auto_bundled">Auto-detect (bundled)</string>
+    <string name="desktop_runtime_auto_vlc">Auto-detect (Program Files\VideoLAN\VLC)</string>
+    <string name="desktop_runtime_vlc_detected">&#32;— VLC detected</string>
+    <string name="desktop_runtime_vlc_missing">&#32;— VLC not found</string>
+    <string name="desktop_runtime_ffmpeg_path">FFmpeg executable path (for MP3 &amp; video muxing)</string>
+    <string name="desktop_runtime_auto_path">Auto-detect on PATH / winget</string>
+    <string name="desktop_runtime_ffmpeg_detected">&#32;— FFmpeg detected</string>
+    <string name="desktop_runtime_ffmpeg_missing">&#32;— FFmpeg not found</string>
+    <string name="desktop_runtime_mp3_bitrate">MP3 download bitrate</string>
+    <string name="desktop_runtime_tray_audio">Minimize to system tray during background audio</string>
+    <string name="desktop_runtime_tray_audio_summary">Keep audio playing in the Windows notification area when closing/minimizing</string>
+</resources>

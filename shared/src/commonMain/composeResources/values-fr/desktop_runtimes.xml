@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="desktop_runtime_data_saver_desktop">Économie de données (ordinateur)</string>
+    <string name="desktop_runtime_data_saver_mode">Mode économie de données</string>
+    <string name="desktop_runtime_data_saver_summary">Limiter la résolution de lecture, réduire le débit audio des téléchargements et la qualité des miniatures</string>
+    <string name="desktop_runtime_data_saver_resolution">Résolution maximale en économie de données</string>
+    <string name="desktop_runtime_data_saver_audio">Privilégier la lecture audio en économie de données</string>
+    <string name="desktop_runtime_data_saver_audio_summary">Démarrer les flux en mode audio en arrière-plan lorsque l’économie de données est active</string>
+    <string name="desktop_runtime_windows_runtimes">Ordinateur Windows (VLC et FFmpeg)</string>
+    <string name="desktop_runtime_vlc_folder">Chemin du dossier VLC / libVLC</string>
+    <string name="desktop_runtime_auto_bundled">Détection automatique (version incluse)</string>
+    <string name="desktop_runtime_auto_vlc">Détection automatique (Program Files\VideoLAN\VLC)</string>
+    <string name="desktop_runtime_vlc_detected">&#32;— VLC détecté</string>
+    <string name="desktop_runtime_vlc_missing">&#32;— VLC introuvable</string>
+    <string name="desktop_runtime_ffmpeg_path">Chemin de l’exécutable FFmpeg (MP3 et assemblage vidéo)</string>
+    <string name="desktop_runtime_auto_path">Détection automatique via PATH / winget</string>
+    <string name="desktop_runtime_ffmpeg_detected">&#32;— FFmpeg détecté</string>
+    <string name="desktop_runtime_ffmpeg_missing">&#32;— FFmpeg introuvable</string>
+    <string name="desktop_runtime_mp3_bitrate">Débit des téléchargements MP3</string>
+    <string name="desktop_runtime_tray_audio">Réduire dans la zone de notification pendant la lecture audio</string>
+    <string name="desktop_runtime_tray_audio_summary">Poursuivre la lecture audio dans la zone de notification Windows lors de la fermeture ou de la réduction</string>
+</resources>

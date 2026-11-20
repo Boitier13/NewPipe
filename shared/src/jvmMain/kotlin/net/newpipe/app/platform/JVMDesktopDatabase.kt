@@ -64,6 +64,7 @@ class JVMDesktopDatabase(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val driver = BundledSQLiteDriver()
     private var connection: SQLiteConnection? = null
+    private var initialRecoveryChecked = false
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -96,6 +97,10 @@ class JVMDesktopDatabase(
     private fun ensureOpenLocked(): SQLiteConnection {
         connection?.let { return it }
         val dbFile = WindowsAppPaths.databaseFile()
+        if (!initialRecoveryChecked) {
+            DesktopBackupStore.assertNoPendingRecovery(dbFile)
+            initialRecoveryChecked = true
+        }
         dbFile.parentFile?.mkdirs()
         val conn = driver.open(dbFile.absolutePath)
         try {

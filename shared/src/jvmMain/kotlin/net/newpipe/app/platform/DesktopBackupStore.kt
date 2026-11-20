@@ -76,6 +76,7 @@ internal class DesktopBackupStore(
                 JsonObject(mapOf("type" to JsonPrimitive(value.kind.name), "value" to value.jsonValue()))
             }).toString())
             force(preferencesRescue)
+            writeRecoveryState(work, "pending")
             checkpoint("before-close")
             val movedOriginals = mutableListOf<Pair<File, File>>()
             var candidateInstalled = false
@@ -99,6 +100,7 @@ internal class DesktopBackupStore(
                 checkpoint("after-settings")
                 reopenDatabase()
                 checkpoint("after-reopen")
+                writeRecoveryState(work, "completed")
                 preserveRecovery = false
             } catch (failure: Exception) {
                 val recoveryErrors = mutableListOf<Exception>()
@@ -143,6 +145,7 @@ internal class DesktopBackupStore(
                     recoveryErrors.forEach(error::addSuppressed)
                     throw error
                 }
+                writeRecoveryState(work, "completed")
                 preserveRecovery = false
                 throw DesktopBackupException(
                     "La restauration a échoué. La base et les paramètres précédents ont été rétablis.", failure
@@ -356,6 +359,34 @@ internal class DesktopBackupStore(
             "La vérification des paramètres enregistrés a échoué.")
     }
 
+    private fun writeRecoveryState(work: File, state: String) {
+        val marker = File(work, "recovery-state.txt")
+        marker.writeText(state, Charsets.UTF_8)
+        force(marker)
+    }
+
+    companion object {
+        /** Fail closed before initial database creation. Never guess which generation to keep. */
+        internal fun assertNoPendingRecovery(databaseFile: File) {
+            val parent = databaseFile.absoluteFile.parentFile
+            val entries = parent.listFiles()
+            if (parent.exists() && entries == null) {
+                throw DesktopBackupException("Impossible de vérifier les copies de récupération. Vérifiez les droits d’accès.")
+            }
+            entries.orEmpty().filter { it.isDirectory && it.name.startsWith(".boitiertube-backup-") }.forEach { work ->
+                val marker = File(work, "recovery-state.txt")
+                val state = if (marker.isFile) runCatching { marker.readText(Charsets.UTF_8) }.getOrNull() else null
+                val hasRescue = File(work, "previous.db").exists() && File(work, "previous-settings.json").exists()
+                if ((marker.exists() || hasRescue) && state != "completed") {
+                    throw DesktopBackupException(
+                        "Une restauration interrompue nécessite une récupération avant de rouvrir la base. " +
+                            "Ne supprimez et ne déplacez aucun fichier. Copies conservées dans : ${work.absolutePath}"
+                    )
+                }
+            }
+        }
+    }
+
     private fun createWorkDirectory(): File = try {
         Files.createTempDirectory(databaseFile.absoluteFile.parentFile.toPath(), ".boitiertube-backup-").toFile()
     } catch (error: Exception) {
@@ -414,4 +445,9 @@ internal class DesktopBackupStore(
     private fun requireBackup(condition: Boolean, message: String) {
         if (!condition) throw DesktopBackupException(message)
     }
+}
+
+/** Called before showing desktop UI; also checked by the database gateway before initial open. */
+fun verifyDesktopRecoveryState() {
+    DesktopBackupStore.assertNoPendingRecovery(WindowsAppPaths.databaseFile())
 }
