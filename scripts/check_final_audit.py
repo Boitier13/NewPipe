@@ -103,6 +103,19 @@ class FinalAuditTests(unittest.TestCase):
         self.assertIn('DownloadQueueGate', manager)
         self.assertNotIn('serialSemaphore', manager)
 
+    def test_final_download_phases_and_portable_traceability(self):
+        screen = self.text('shared/src/commonMain/kotlin/net/newpipe/app/screen/desktop/DownloadsScreen.kt')
+        self.assertIn('task.totalBytes > 0L', screen)
+        self.assertIn('LinearProgressIndicator(progress = { 0f }', screen)
+        self.assertIn('coerceAtMost(99)', screen)
+        manager = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/JVMDownloadController.kt')
+        self.assertIn('completedFile.isFile && finalSize > 0L', manager)
+        self.assertIn('else 0L', manager)
+        workflow = self.text('.github/workflows/ci.yml')
+        for token in ['VERSION-PORTABLE.txt', 'Commit : $env:GITHUB_SHA', 'ZipFile]::OpenRead',
+                      'Portable ZIP commit mismatch', 'FinalDownloadAuditTest = 3']:
+            self.assertIn(token, workflow)
+
     def test_backup_bounds_and_schema_precede_live_changes(self):
         source = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/DesktopBackupStore.kt')
         for token in ['CRC32', 'decodeToString(throwOnInvalidSequence = true)', 'rejectDuplicateKeys',

@@ -224,7 +224,29 @@ jobs:
           Copy-Item scripts/Start-BoitierTube-Portable.cmd "$appDir/Start-BoitierTube-Portable.cmd"
           Copy-Item doc/boitiertube-portable.md "$appDir/PORTABLE.md"
           Copy-Item doc/boitiertube-guide-quotidien.md "$appDir/GUIDE.md"
+          @(
+            "BoitierTube portable Windows x64",
+            "Commit : $env:GITHUB_SHA",
+            "Validation : https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID",
+            "Lancement : Start-BoitierTube-Portable.cmd",
+            "Guide : GUIDE.md"
+          ) | Set-Content -Path "$appDir/VERSION-PORTABLE.txt" -Encoding utf8
           Compress-Archive -Path $appDir -DestinationPath "desktopApp/build/BoitierTube-windows-x64.zip"
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $PWD "desktopApp/build/BoitierTube-windows-x64.zip"))
+          try {
+            $names = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+            foreach ($required in @('BoitierTube.exe', 'Start-BoitierTube-Portable.cmd', 'PORTABLE.md', 'GUIDE.md', 'VERSION-PORTABLE.txt')) {
+              if ("BoitierTube/$required" -notin $names) { throw "Portable ZIP missing $required" }
+            }
+            if (@($names | Where-Object { $_ -like 'BoitierTube/data/*' }).Count -ne 0) {
+              throw 'Portable ZIP must not contain a pre-existing user profile'
+            }
+            $version = $zip.Entries | Where-Object { $_.FullName.Replace('\', '/') -eq 'BoitierTube/VERSION-PORTABLE.txt' }
+            $reader = [System.IO.StreamReader]::new($version.Open())
+            try {
+              if (-not $reader.ReadToEnd().Contains("Commit : $env:GITHUB_SHA")) { throw 'Portable ZIP commit mismatch' }
+            } finally { $reader.Dispose() }
+          } finally { $zip.Dispose() }
           Get-FileHash "desktopApp/build/BoitierTube-windows-x64.zip" -Algorithm SHA256 | Format-List
 
       - name: Upload runnable Windows ZIP
