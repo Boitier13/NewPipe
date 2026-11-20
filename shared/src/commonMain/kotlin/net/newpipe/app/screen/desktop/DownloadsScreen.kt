@@ -42,6 +42,9 @@ import net.newpipe.app.model.DownloadStatus
 import net.newpipe.app.viewmodel.desktop.DownloadsViewModel
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.desktop_clear_completed
+import newpipe.shared.generated.resources.desktop_accessibility_play
+import newpipe.shared.generated.resources.desktop_accessibility_cancel
+import newpipe.shared.generated.resources.desktop_accessibility_remove
 import newpipe.shared.generated.resources.desktop_ffmpeg_missing_hint
 import newpipe.shared.generated.resources.desktop_nav_downloads
 import newpipe.shared.generated.resources.desktop_no_downloads
@@ -171,7 +174,7 @@ fun DownloadsScreen(
                                     IconButton(onClick = { viewModel.playDownloadedTask(task) }) {
                                         Icon(
                                             painter = painterResource(Res.drawable.ic_play_arrow),
-                                            contentDescription = "Play"
+                                            contentDescription = stringResource(Res.string.desktop_accessibility_play)
                                         )
                                     }
                                 }
@@ -191,14 +194,14 @@ fun DownloadsScreen(
                                     IconButton(onClick = { viewModel.cancelTask(task.id) }) {
                                         Icon(
                                             painter = painterResource(Res.drawable.ic_close),
-                                            contentDescription = "Cancel"
+                                            contentDescription = stringResource(Res.string.desktop_accessibility_cancel)
                                         )
                                     }
                                 } else {
                                     IconButton(onClick = { viewModel.removeTask(task.id) }) {
                                         Icon(
                                             painter = painterResource(Res.drawable.ic_delete),
-                                            contentDescription = "Remove"
+                                            contentDescription = stringResource(Res.string.desktop_accessibility_remove)
                                         )
                                     }
                                 }
