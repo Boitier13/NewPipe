@@ -50,6 +50,8 @@ import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.viewmodel.desktop.HistoryViewModel
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.desktop_clear_all
+import newpipe.shared.generated.resources.desktop_accessibility_delete
+import newpipe.shared.generated.resources.desktop_accessibility_resume
 import newpipe.shared.generated.resources.desktop_nav_history
 import newpipe.shared.generated.resources.desktop_no_history
 import newpipe.shared.generated.resources.desktop_search_history_tab
@@ -170,7 +172,7 @@ fun HistoryScreen(
                                         }
                                         if (entry.progressMillis > 1000L) {
                                             if (isNotEmpty()) append(" • ")
-                                            append("Resume at ${formatMillis(entry.progressMillis)}")
+                                            append(stringResource(Res.string.desktop_accessibility_resume, formatMillis(entry.progressMillis)))
                                         }
                                         if (entry.repeatCount > 1L) {
                                             if (isNotEmpty()) append(" • ")
@@ -186,7 +188,7 @@ fun HistoryScreen(
                                     }
                                 }
                                 IconButton(onClick = { viewModel.deleteWatchEntry(entry.streamId) }) {
-                                    Icon(painterResource(Res.drawable.ic_delete), contentDescription = "Delete")
+                                    Icon(painterResource(Res.drawable.ic_delete), contentDescription = stringResource(Res.string.desktop_accessibility_delete))
                                 }
                             }
                         }
