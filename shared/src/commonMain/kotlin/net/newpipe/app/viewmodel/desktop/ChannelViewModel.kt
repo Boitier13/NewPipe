@@ -53,7 +53,7 @@ class ChannelViewModel(
                 },
                 onFailure = { err ->
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = err.message ?: "Failed to load channel")
+                        it.copy(isLoading = false, errorMessage = "Impossible de charger la chaîne. Vérifiez la connexion et réessayez.")
                     }
                 }
             )
@@ -83,7 +83,7 @@ class ChannelViewModel(
                 },
                 onFailure = { err ->
                     _uiState.update {
-                        it.copy(isLoadingMore = false, errorMessage = err.message)
+                        it.copy(isLoadingMore = false, errorMessage = "Impossible de charger la suite de la chaîne. Réessayez.")
                     }
                 }
             )

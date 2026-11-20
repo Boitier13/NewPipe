@@ -176,7 +176,7 @@ class JVMDownloadController(
         }
 
         val qualityLabel = when (format) {
-            DownloadFormat.FLAC -> "Lossless"
+            DownloadFormat.FLAC -> "Sans perte"
             DownloadFormat.WAV -> "PCM"
             else -> effectiveKbps?.let { "$it kbps" } ?: "${effectiveOption.bitrateKbps} kbps"
         }
@@ -464,8 +464,12 @@ class JVMDownloadController(
                         }
                     } else {
                         val fallbackWebm = uniqueOutputFile(outputFile.parentFile, outputFile.nameWithoutExtension, "webm")
-                        tmpVideo.copyTo(fallbackWebm, overwrite = true)
-                        updateTask(taskId) { it.copy(outputPath = fallbackWebm.absolutePath) }
+                        try {
+                            tmpVideo.copyTo(fallbackWebm, overwrite = false)
+                            updateTask(taskId) { it.copy(outputPath = fallbackWebm.absolutePath) }
+                        } finally {
+                            outputNames.release(fallbackWebm)
+                        }
                     }
                 }
             } else {
@@ -766,7 +770,9 @@ class JVMDownloadController(
                 }
             }
 
-            val finalSize = outputFile.takeIf { it.exists() }?.length() ?: _tasks.value.firstOrNull { it.id == taskId }?.downloadedBytes ?: 0L
+            val completedFile = File(_tasks.value.firstOrNull { it.id == taskId }?.outputPath ?: outputFile.absolutePath)
+            val finalSize = completedFile.length()
+            check(completedFile.isFile && finalSize > 0L) { "Le fichier final est absent ou vide." }
             logDownload("[$taskId] MP4 completed: size=${finalSize}B, file='${outputFile.absolutePath}'")
             updateTask(taskId) {
                 it.copy(
@@ -791,7 +797,7 @@ class JVMDownloadController(
             updateTask(taskId) {
                 it.copy(
                     status = DownloadStatus.FAILED,
-                    statusMessage = t.message ?: "Échec du téléchargement"
+                    statusMessage = "Échec du téléchargement. Vérifiez la connexion et le dossier choisi. Détails : download_mux.log."
                 )
             }
         } finally {
@@ -915,8 +921,12 @@ class JVMDownloadController(
                     }
                     if (!muxed) {
                         val webmOut = uniqueOutputFile(outputFile.parentFile, outputFile.nameWithoutExtension, "webm")
-                        rawTmp.copyTo(webmOut, overwrite = true)
-                        updateTask(taskId) { it.copy(outputPath = webmOut.absolutePath) }
+                        try {
+                            rawTmp.copyTo(webmOut, overwrite = false)
+                            updateTask(taskId) { it.copy(outputPath = webmOut.absolutePath) }
+                        } finally {
+                            outputNames.release(webmOut)
+                        }
                     }
                 } else {
                     val remuxed = if (muxer != null && format == DownloadFormat.M4A) {
@@ -964,7 +974,9 @@ class JVMDownloadController(
                 }
             }
 
-            val finalSize = outputFile.takeIf { it.exists() }?.length() ?: 0L
+            val completedFile = File(_tasks.value.firstOrNull { it.id == taskId }?.outputPath ?: outputFile.absolutePath)
+            val finalSize = completedFile.length()
+            check(completedFile.isFile && finalSize > 0L) { "Le fichier final est absent ou vide." }
             logDownload("[$taskId] Audio completed: size=${finalSize}B, file='${outputFile.absolutePath}'")
             updateTask(taskId) {
                 it.copy(
@@ -989,7 +1001,7 @@ class JVMDownloadController(
             updateTask(taskId) {
                 it.copy(
                     status = DownloadStatus.FAILED,
-                    statusMessage = t.message ?: "Échec du téléchargement"
+                    statusMessage = "Échec du téléchargement. Vérifiez la connexion et le dossier choisi. Détails : download_mux.log."
                 )
             }
         } finally {
@@ -1143,7 +1155,7 @@ class JVMDownloadController(
                     }
                 }
 
-                val finalTotal = if (knownTotal > 0L) knownTotal else downloaded
+                val finalTotal = if (knownTotal > 0L) knownTotal else 0L
                 onProgress(downloaded, finalTotal)
 
                 if (!isPartial) {
@@ -1355,7 +1367,7 @@ class JVMDownloadController(
         updateTask(taskId) {
             it.copy(
                 downloadedBytes = downloaded,
-                totalBytes = total.coerceAtLeast(downloaded),
+                totalBytes = if (total > 0L) total.coerceAtLeast(downloaded) else 0L,
                 progress = progress,
                 statusMessage = speedLabel(taskId, downloaded)
             )

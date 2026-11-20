@@ -242,7 +242,7 @@ class VlcMediaPlayerController(
                 _state.update {
                     it.copy(
                         vlcAvailable = false,
-                        errorMessage = err.message ?: missingVlcMessage()
+                        errorMessage = missingVlcMessage()
                     )
                 }
             }.getOrNull()
@@ -263,7 +263,7 @@ class VlcMediaPlayerController(
                 _state.update {
                     it.copy(
                         vlcAvailable = false,
-                        errorMessage = err.message ?: missingVlcMessage()
+                        errorMessage = missingVlcMessage()
                     )
                 }
             }.getOrNull()
@@ -332,7 +332,7 @@ class VlcMediaPlayerController(
                         it.copy(
                             isPlaying = false,
                             isBuffering = false,
-                            errorMessage = "VLC playback error"
+                            errorMessage = "La lecture VLC a échoué. Réessayez avec un autre format."
                         )
                     }
                 }
@@ -598,7 +598,7 @@ class VlcMediaPlayerController(
                 if (mrl.isNullOrBlank()) {
                     playbackTransitioning.set(false)
                     _state.update {
-                        it.copy(isBuffering = false, errorMessage = "No playable audio stream found")
+                        it.copy(isBuffering = false, errorMessage = "Aucun flux audio lisible disponible.")
                     }
                     return@execute
                 }
@@ -614,7 +614,7 @@ class VlcMediaPlayerController(
                 if (mrl.isNullOrBlank()) {
                     playbackTransitioning.set(false)
                     _state.update {
-                        it.copy(isBuffering = false, errorMessage = "No playable video stream found")
+                        it.copy(isBuffering = false, errorMessage = "Aucun flux vidéo lisible disponible.")
                     }
                     return@execute
                 }

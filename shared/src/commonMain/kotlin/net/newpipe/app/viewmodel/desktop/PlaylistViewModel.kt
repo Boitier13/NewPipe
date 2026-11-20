@@ -60,7 +60,7 @@ class PlaylistViewModel(
                 },
                 onFailure = { err ->
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = err.message ?: "Failed to load playlist")
+                        it.copy(isLoading = false, errorMessage = "Impossible de charger la liste de lecture. Vérifiez la connexion et réessayez.")
                     }
                 }
             )
@@ -88,7 +88,7 @@ class PlaylistViewModel(
                 },
                 onFailure = { err ->
                     _uiState.update {
-                        it.copy(isLoadingMore = false, errorMessage = err.message)
+                        it.copy(isLoadingMore = false, errorMessage = "Impossible de charger la suite de la liste. Réessayez.")
                     }
                 }
             )

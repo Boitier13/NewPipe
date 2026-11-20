@@ -77,7 +77,7 @@ class VideoDetailViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = err.message ?: "Failed to load video"
+                            errorMessage = "Impossible de charger la vidéo. Vérifiez la connexion et réessayez."
                         )
                     }
                 }

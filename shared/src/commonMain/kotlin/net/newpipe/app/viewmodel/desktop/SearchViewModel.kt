@@ -87,7 +87,7 @@ class SearchViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = err.message ?: "Failed to load trending videos"
+                            errorMessage = "Impossible de charger les tendances. Vérifiez la connexion et réessayez."
                         )
                     }
                 }
@@ -168,7 +168,7 @@ class SearchViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = err.message ?: "Search failed"
+                            errorMessage = "La recherche a échoué. Vérifiez la connexion et réessayez."
                         )
                     }
                 }
@@ -209,7 +209,7 @@ class SearchViewModel(
                     _uiState.update {
                         it.copy(
                             isLoadingMore = false,
-                            errorMessage = err.message
+                            errorMessage = "Impossible de charger la suite des résultats. Réessayez."
                         )
                     }
                 }

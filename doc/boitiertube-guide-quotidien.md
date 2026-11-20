@@ -93,3 +93,24 @@ le clic et peut être ambigu en cas de changements très rapides de vidéo. Les 
 être additionnées aveuglément, certaines étapes étant incluses dans d’autres. La création native est
 paresseuse puis réutilisée ; FFmpeg est destiné aux téléchargements/conversions, pas à la lecture
 VLC habituelle. Aucune accélération sur votre PC n’est affirmée sans cette nouvelle mesure.
+
+## Une deuxième tâche semble ralentir la première
+
+La limite d’une tâche est volontaire et reste inchangée. Une tâche **en attente** ne télécharge pas
+ses flux et ne lance pas FFmpeg. En revanche, ouvrir sa vidéo peut déclencher extraction et lecture
+automatique : la lecture consomme elle aussi réseau, processeur et disque. Faites un essai en mettant
+la lecture en pause, sans fermer l’application, puis comparez le débit de la première tâche.
+Ce n’est pas la preuve que la lecture explique votre ralentissement : réseau YouTube, assemblage,
+réencodage et analyse antivirus peuvent aussi intervenir. Aucun gain n’est garanti.
+
+Dans le Gestionnaire des tâches Windows, observez CPU, mémoire, disque et réseau de BoitierTube et
+`ffmpeg.exe`, avant et après l’ajout. Notez le message de la tâche : un assemblage ou encodage n’est
+plus un transfert réseau. N’arrêtez pas brutalement ces processus et ne désactivez pas l’antivirus.
+
+La progression de transfert est **indicative**, pas un temps restant. Si la taille est inconnue,
+aucun pourcentage n’est affiché. En assemblage/conversion, la barre est animée et le message indique
+l’étape (et son avancement lorsque disponible). La préparation finale peut durer même à la fin de
+l’étape FFmpeg. « Terminé » n’apparaît qu’après succès et présence d’un fichier final non vide.
+Les temporaires propres à la tâche sont nettoyés dans son bloc de fin ; après une coupure de courant
+ou un arrêt forcé, des restes peuvent subsister. Aucun nettoyage global des anciens fichiers n’est
+lancé pour éviter d’effacer des données qui ne sont pas à cette tâche.

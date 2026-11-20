@@ -6,4 +6,5 @@
     <string name="post_queued">En attente d’une place dans la file</string>
     <string name="post_subscription_intro">Aucune connexion Google dans BoitierTube : vos abonnements sont conservés sur cet ordinateur. Ajoutez une chaîne depuis sa page ou importez un fichier.</string>
     <string name="post_subscription_guide">Guide d’importation</string>
+    <string name="post_progress_hint">La progression du transfert est indicative. Pendant l’assemblage ou la conversion, suivez le message de l’étape ; la barre animée n’indique pas un temps restant. Une tâche en attente ne transfère rien.</string>
 </resources>

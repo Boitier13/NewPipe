@@ -43,6 +43,7 @@ import net.newpipe.app.viewmodel.desktop.DownloadsViewModel
 import newpipe.shared.generated.resources.post_download_destinations
 import newpipe.shared.generated.resources.post_queue_hint
 import newpipe.shared.generated.resources.post_queued
+import newpipe.shared.generated.resources.post_progress_hint
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.desktop_clear_completed
 import newpipe.shared.generated.resources.desktop_accessibility_play
@@ -87,6 +88,7 @@ fun DownloadsScreen(
 
         Text(stringResource(Res.string.post_download_destinations), style = MaterialTheme.typography.bodySmall)
         Text(stringResource(Res.string.post_queue_hint), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(Res.string.post_progress_hint), style = MaterialTheme.typography.bodySmall)
 
         if (!ffmpegOk) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -229,7 +231,10 @@ fun DownloadsScreen(
                                         .weight(1f)
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp))
-                                    if (task.progress > 0f) {
+                                    val measuredDownload = task.status == DownloadStatus.DOWNLOADING && task.totalBytes > 0L && task.progress > 0f
+                                    if (task.status == DownloadStatus.QUEUED) {
+                                        LinearProgressIndicator(progress = { 0f }, modifier = barModifier)
+                                    } else if (measuredDownload) {
                                         LinearProgressIndicator(
                                             progress = { task.progress.coerceIn(0f, 1f) },
                                             modifier = barModifier
@@ -237,10 +242,10 @@ fun DownloadsScreen(
                                     } else {
                                         LinearProgressIndicator(modifier = barModifier)
                                     }
-                                    val pct = (task.progress.coerceIn(0f, 1f) * 100f).roundToInt()
+                                    val pct = (task.progress.coerceIn(0f, 1f) * 100f).roundToInt().coerceAtMost(99)
                                     val bytesInfo = buildString {
-                                        if (task.progress > 0f) {
-                                            append("$pct%")
+                                        if (measuredDownload) {
+                                            append("≈ $pct %")
                                         }
                                         if (task.downloadedBytes > 0L) {
                                             if (isNotEmpty()) append(" • ")
