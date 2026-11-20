@@ -128,7 +128,8 @@
     <string name="desktop_accessibility_back">Retour</string>
     <string name="desktop_accessibility_refresh">Actualiser</string>
     <string name="desktop_accessibility_reload">Recharger</string>
-    <string name="desktop_accessibility_play_pause">Lire ou mettre en pause</string>
+    <string name="desktop_accessibility_play">Lire</string>
+    <string name="desktop_accessibility_pause">Mettre en pause</string>
     <string name="desktop_accessibility_mute">Couper ou rétablir le son</string>
     <string name="desktop_accessibility_fullscreen">Plein écran</string>
     <string name="desktop_accessibility_resume">Reprendre à %1$s</string>
