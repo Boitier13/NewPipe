@@ -5,7 +5,9 @@
 
 package net.newpipe.app.di.settings
 
+import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.PreferencesSettings
+import java.io.Flushable
 import com.russhwolf.settings.Settings
 import java.util.prefs.Preferences
 import org.koin.core.annotation.Singleton
@@ -14,4 +16,11 @@ import org.koin.core.annotation.Singleton
  * Settings for JVM devices based on Java Preferences
  */
 @Singleton
-fun provideSettings(): Settings = PreferencesSettings(Preferences.userRoot())
+fun provideSettings(): Settings = DurablePreferencesSettings(Preferences.userRoot())
+
+/** Keep observable behavior while allowing backup transactions to detect persistence failures. */
+internal class DurablePreferencesSettings(
+    private val preferences: Preferences
+) : ObservableSettings by PreferencesSettings(preferences), Flushable {
+    override fun flush() = preferences.flush()
+}

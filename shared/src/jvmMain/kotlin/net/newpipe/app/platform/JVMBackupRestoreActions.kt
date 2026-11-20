@@ -7,6 +7,7 @@ package net.newpipe.app.platform
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import co.touchlab.kermit.Logger
 import com.russhwolf.settings.Settings
 import java.awt.FileDialog
 import java.awt.Frame
@@ -45,8 +46,8 @@ class JVMBackupRestoreActions(
                     val dialogTitle = when (file) {
                         BackupFile.DATA_EXPORT -> "Exporter une sauvegarde BoitierTube"
                         BackupFile.DATA_IMPORT -> "Importer une sauvegarde BoitierTube / NewPipe"
-                        BackupFile.SUBSCRIPTIONS_EXPORT -> "Export Subscriptions JSON"
-                        BackupFile.SUBSCRIPTIONS_IMPORT -> "Import Subscriptions (CSV / JSON)"
+                        BackupFile.SUBSCRIPTIONS_EXPORT -> "Exporter les abonnements (JSON)"
+                        BackupFile.SUBSCRIPTIONS_IMPORT -> "Importer les abonnements (CSV / JSON)"
                     }
                     val dialog = FileDialog(
                         null as Frame?,
@@ -88,7 +89,7 @@ class JVMBackupRestoreActions(
             onSuccess = { DataExportResult.Success },
             onFailure = { err ->
                 DataExportResult.Failed(
-                    ErrorReport(message = err.message ?: "Failed to export backup", open = {})
+                    ErrorReport(message = backupErrorMessage(err, importing = false), open = {})
                 )
             }
         )
@@ -100,18 +101,13 @@ class JVMBackupRestoreActions(
             onSuccess = {
                 DataImportResult.Imported(
                     allFilesImported = true,
-                    settingsFormat = SettingsFormat.JSON
+                    settingsFormat = null // Database and preferences have already committed together.
                 )
             },
             onFailure = { err ->
-                val msg = err.message.orEmpty()
-                if (msg.contains("Invalid NewPipe backup")) {
-                    DataImportResult.InvalidFile
-                } else {
-                    DataImportResult.Failed(
-                        ErrorReport(message = msg.ifBlank { "Failed to import backup" }, open = {})
-                    )
-                }
+                DataImportResult.Failed(
+                    ErrorReport(message = backupErrorMessage(err, importing = true), open = {})
+                )
             }
         )
     }
@@ -136,5 +132,15 @@ class JVMBackupRestoreActions(
         scope.launch {
             database.importSubscriptionsJson(file)
         }
+    }
+}
+
+/** Never expose raw SQLite, ZIP, filesystem or backend exception text to the user. */
+internal fun backupErrorMessage(error: Throwable, importing: Boolean): String {
+    Logger.e(error) { "Desktop backup operation failed" }
+    return (error as? DesktopBackupException)?.message ?: if (importing) {
+        "Impossible de restaurer la sauvegarde. Vérifiez le fichier, les droits d’accès et l’espace disque."
+    } else {
+        "Impossible de créer la sauvegarde. Vérifiez les droits d’écriture et l’espace disque."
     }
 }

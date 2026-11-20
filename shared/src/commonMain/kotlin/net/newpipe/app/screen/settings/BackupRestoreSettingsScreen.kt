@@ -47,6 +47,7 @@ import net.newpipe.app.screen.settings.model.BackupRestoreMessage
 import net.newpipe.app.screen.settings.model.SettingsImport
 import net.newpipe.app.viewmodel.settings.BackupRestoreSettingsViewModel
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.desktop_backup_import_complete
 import newpipe.shared.generated.resources.cancel
 import newpipe.shared.generated.resources.could_not_import_all_files
 import newpipe.shared.generated.resources.error_snackbar_action
@@ -165,6 +166,10 @@ fun BackupRestoreSettingsScreenContent(
 
     val messageText = message?.let { pending ->
         when (pending) {
+            BackupRestoreMessage.ImportComplete -> {
+                stringResource(Res.string.desktop_backup_import_complete)
+            }
+
             BackupRestoreMessage.ExportComplete -> {
                 stringResource(Res.string.export_complete_toast)
             }

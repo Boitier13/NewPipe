@@ -9,6 +9,8 @@ import net.newpipe.app.model.ErrorReport
 
 sealed interface BackupRestoreMessage {
 
+    data object ImportComplete : BackupRestoreMessage
+
     data object ExportComplete : BackupRestoreMessage
 
     data object InvalidFile : BackupRestoreMessage

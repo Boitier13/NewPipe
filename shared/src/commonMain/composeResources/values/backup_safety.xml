@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="desktop_backup_import_complete">La sauvegarde et les paramètres ont été restaurés.</string>
+</resources>

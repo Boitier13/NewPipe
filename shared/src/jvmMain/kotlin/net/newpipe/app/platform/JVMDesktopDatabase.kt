@@ -12,11 +12,6 @@ import androidx.sqlite.execSQL
 import co.touchlab.kermit.Logger
 import com.russhwolf.settings.Settings
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,9 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 import net.newpipe.app.BuildConfig
 import net.newpipe.app.model.ChannelDetails
 import net.newpipe.app.model.ChannelSummary
@@ -105,11 +98,16 @@ class JVMDesktopDatabase(
         val dbFile = WindowsAppPaths.databaseFile()
         dbFile.parentFile?.mkdirs()
         val conn = driver.open(dbFile.absolutePath)
-        conn.execSQL("PRAGMA foreign_keys = ON")
-        conn.execSQL("PRAGMA journal_mode = WAL")
-        createSchema(conn)
-        connection = conn
-        return conn
+        try {
+            conn.execSQL("PRAGMA foreign_keys = ON")
+            conn.execSQL("PRAGMA journal_mode = WAL")
+            createSchema(conn)
+            connection = conn
+            return conn
+        } catch (failure: Exception) {
+            runCatching { conn.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
+        }
     }
 
     private fun createSchema(conn: SQLiteConnection) {
@@ -296,9 +294,12 @@ class JVMDesktopDatabase(
     }
 
     private fun refreshAllLocked(conn: SQLiteConnection) {
-        _subscriptions.value = querySubscriptionsLocked(conn)
-        _watchHistory.value = queryWatchHistoryLocked(conn)
-        _searchHistory.value = querySearchHistoryLocked(conn)
+        val subscriptions = querySubscriptionsLocked(conn)
+        val watchHistory = queryWatchHistoryLocked(conn)
+        val searchHistory = querySearchHistoryLocked(conn)
+        _subscriptions.value = subscriptions
+        _watchHistory.value = watchHistory
+        _searchHistory.value = searchHistory
     }
 
     private fun querySubscriptionsLocked(conn: SQLiteConnection): List<SubscriptionRecord> {
@@ -711,94 +712,82 @@ class JVMDesktopDatabase(
         }.getOrElse { false }
     }
 
-    override suspend fun exportDatabase(targetPath: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val destinationZip = File(targetPath)
-                mutex.withLock {
-                    val conn = ensureOpenLocked()
-                    runCatching { conn.execSQL("PRAGMA wal_checkpoint(TRUNCATE)") }
-                    conn.close()
-                    connection = null
-
-                    val dbFile = WindowsAppPaths.databaseFile()
-                    val prefsMap = settings.keys.associateWith { key ->
-                        runCatching { settings.getStringOrNull(key) }.getOrNull() ?: ""
-                    }
-                    val prefsJson = json.encodeToString(
-                        MapSerializer(serializer<String>(), serializer<String>()),
-                        prefsMap
-                    )
-
-                    destinationZip.parentFile?.mkdirs()
-                    ZipOutputStream(FileOutputStream(destinationZip).buffered()).use { zip ->
-                        if (dbFile.exists()) {
-                            zip.putNextEntry(ZipEntry("newpipe.db"))
-                            FileInputStream(dbFile).use { it.copyTo(zip) }
-                            zip.closeEntry()
-                        }
-                        zip.putNextEntry(ZipEntry("newpipe.json"))
-                        zip.write(prefsJson.toByteArray(Charsets.UTF_8))
-                        zip.closeEntry()
-                    }
-
-                    val reopened = ensureOpenLocked()
-                    refreshAllLocked(reopened)
+    private fun backupStoreLocked() = DesktopBackupStore(
+        databaseFile = WindowsAppPaths.databaseFile(),
+        settings = settings,
+        snapshotDatabase = { target ->
+            val conn = ensureOpenLocked()
+            conn.prepare("VACUUM INTO ?").use { statement ->
+                statement.bindText(1, target.absolutePath)
+                statement.step()
+            }
+        },
+        prepareDatabase = { candidate ->
+            driver.open(candidate.absolutePath).use { conn ->
+                conn.execSQL("PRAGMA trusted_schema = OFF")
+                val version = conn.prepare("PRAGMA user_version").use { stmt ->
+                    check(stmt.step())
+                    stmt.getLong(0)
                 }
+                if (version !in 0L..9L) {
+                    throw DesktopBackupException("Cette version de sauvegarde n’est pas compatible avec BoitierTube.")
+                }
+                // Do not accept an unrelated, empty SQLite file as a NewPipe database.
+                for (table in listOf("subscriptions", "streams", "stream_history", "search_history")) {
+                    conn.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").use { stmt ->
+                        stmt.bindText(1, table)
+                        if (!stmt.step()) throw DesktopBackupException("La sauvegarde ne contient pas une base NewPipe compatible.")
+                    }
+                }
+                conn.execSQL("PRAGMA journal_mode = DELETE")
+                createSchema(conn)
+                // Also check write-only/less frequently opened features before accepting a schema.
+                val requiredColumns = mapOf(
+                    "subscriptions" to "uid, service_id, url, name, avatar_url, subscriber_count, description, notification_mode",
+                    "streams" to "uid, service_id, url, title, stream_type, duration, uploader, uploader_url, thumbnail_url, view_count, textual_upload_date, upload_date, is_upload_date_approximation",
+                    "search_history" to "id, creation_date, service_id, search",
+                    "stream_history" to "stream_id, access_date, repeat_count",
+                    "stream_state" to "stream_id, progress_time",
+                    "playlists" to "uid, name, is_thumbnail_permanent, thumbnail_stream_id, display_index",
+                    "playlist_stream_join" to "playlist_id, stream_id, join_index",
+                    "remote_playlists" to "uid, service_id, name, url, thumbnail_url, uploader, display_index, stream_count",
+                    "feed" to "stream_id, subscription_id",
+                    "feed_group" to "uid, name, icon_id, sort_order",
+                    "feed_group_subscription_join" to "group_id, subscription_id",
+                    "feed_last_updated" to "subscription_id, last_updated"
+                )
+                requiredColumns.forEach { (table, columns) ->
+                    conn.prepare("SELECT $columns FROM $table LIMIT 0").use { it.step() }
+                }
+                // Query on the isolated copy, before closing or modifying the current database.
+                querySubscriptionsLocked(conn)
+                queryWatchHistoryLocked(conn)
+                querySearchHistoryLocked(conn)
+            }
+        },
+        closeDatabase = {
+            connection?.close()
+            connection = null
+        },
+        reopenDatabase = {
+            if (!WindowsAppPaths.databaseFile().isFile) {
+                throw DesktopBackupException("La base est indisponible. Conservez les copies de secours avant de réessayer.")
+            }
+            refreshAllLocked(ensureOpenLocked())
+        }
+    )
+
+    override suspend fun exportDatabase(targetPath: String): Result<Unit> =
+        withContext(Dispatchers.IO + kotlinx.coroutines.NonCancellable) {
+            mutex.withLock {
+                runCatching { backupStoreLocked().exportArchive(File(targetPath)) }
             }
         }
 
     override suspend fun importDatabase(sourcePath: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val sourceZip = File(sourcePath)
-                require(sourceZip.exists() && sourceZip.isFile) { "Backup file not found: $sourcePath" }
-                mutex.withLock {
-                    connection?.close()
-                    connection = null
-
-                    val dbFile = WindowsAppPaths.databaseFile()
-                    dbFile.parentFile?.mkdirs()
-                    File(dbFile.absolutePath + "-wal").delete()
-                    File(dbFile.absolutePath + "-shm").delete()
-                    File(dbFile.absolutePath + "-journal").delete()
-
-                    var extractedDb = false
-                    var importedPrefsJson: String? = null
-
-                    ZipInputStream(FileInputStream(sourceZip).buffered()).use { zip ->
-                        var entry = zip.nextEntry
-                        while (entry != null) {
-                            when (entry.name) {
-                                "newpipe.db" -> {
-                                    FileOutputStream(dbFile).use { out -> zip.copyTo(out) }
-                                    extractedDb = true
-                                }
-                                "newpipe.json" -> {
-                                    importedPrefsJson = zip.readBytes().toString(Charsets.UTF_8)
-                                }
-                            }
-                            zip.closeEntry()
-                            entry = zip.nextEntry
-                        }
-                    }
-
-                    importedPrefsJson?.let { raw ->
-                        runCatching {
-                            val map = json.decodeFromString(
-                                MapSerializer(serializer<String>(), serializer<String>()),
-                                raw
-                            )
-                            map.forEach { (k, v) -> settings.putString(k, v) }
-                        }
-                    }
-
-                    val reopened = ensureOpenLocked()
-                    refreshAllLocked(reopened)
-                    if (!extractedDb && importedPrefsJson == null) {
-                        error("Invalid NewPipe backup archive (missing newpipe.db and newpipe.json)")
-                    }
-                }
+        withContext(Dispatchers.IO + kotlinx.coroutines.NonCancellable) {
+            mutex.withLock {
+                runCatching { backupStoreLocked().importArchive(File(sourcePath)) }
             }
         }
 

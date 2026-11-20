@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="desktop_backup_import_complete">La sauvegarde et les paramètres ont été restaurés.</string>
+    <string name="export_complete_toast">La sauvegarde a été créée.</string>
+    <string name="no_valid_zip_file">Ce fichier ne contient pas une sauvegarde compatible.</string>
+    <string name="could_not_import_all_files">La restauration n’a pas pu être effectuée intégralement.</string>
+    <string name="import_data_title">Restaurer une sauvegarde</string>
+    <string name="import_data_summary">Restaurer la base de données et les paramètres depuis une sauvegarde compatible.</string>
+    <string name="export_data_title">Créer une sauvegarde</string>
+    <string name="export_data_summary">Enregistrer la base de données et les paramètres dans une nouvelle archive ZIP.</string>
+    <string name="override_current_data">Restaurer cette sauvegarde remplacera les données et les paramètres actuels après vérification. Voulez-vous continuer ?</string>
+    <string name="import_settings">Restaurer les paramètres</string>
+    <string name="error_snackbar_action">Détails</string>
+    <string name="no_app_to_open_intent">Impossible d’ouvrir le sélecteur de fichiers</string>
+    <string name="no_appropriate_file_manager_message">Impossible d’ouvrir le sélecteur de fichiers. Vérifiez les autorisations de l’application.</string>
+    <string name="no_appropriate_file_manager_message_android_10">Impossible d’ouvrir le sélecteur de fichiers. Vérifiez les autorisations de l’application.</string>
+    <string name="import_subscriptions_title">Importer les abonnements</string>
+    <string name="import_subscriptions_summary">Importer un fichier d’abonnements compatible.</string>
+    <string name="export_subscriptions_title">Exporter les abonnements</string>
+    <string name="export_subscriptions_summary">Enregistrer les abonnements dans un fichier JSON.</string>
+    <string name="ok">OK</string>
+    <string name="reset_settings_title">Réinitialiser les paramètres</string>
+    <string name="reset_settings_summary">Rétablir les paramètres par défaut.</string>
+    <string name="reset_all_settings">Voulez-vous réinitialiser tous les paramètres ?</string>
+    <string name="import_network_expensive_warning">L’importation des abonnements peut entraîner des accès au réseau. Voulez-vous continuer ?</string>
+    <string name="import_settings_vulnerable_format">Cette ancienne sauvegarde utilise un format de paramètres non pris en charge pour une restauration sécurisée. Utilisez une sauvegarde JSON compatible.</string>
+</resources>

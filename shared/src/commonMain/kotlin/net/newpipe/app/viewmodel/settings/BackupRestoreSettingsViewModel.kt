@@ -79,6 +79,7 @@ class BackupRestoreSettingsViewModel(
         val format = result.settingsFormat
         if (format == null) {
             backupRestoreActions.finishImport(file)
+            if (result.allFilesImported) message.value = BackupRestoreMessage.ImportComplete
         } else {
             pendingSettingsImport.value = SettingsImport(file, format)
         }
