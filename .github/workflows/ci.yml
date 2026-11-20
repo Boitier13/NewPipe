@@ -93,7 +93,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $expected = @{ DesktopBackupStoreTest = 19; DesktopRecoveryJournalTest = 4; PortableProfileTest = 6; DesktopDownloaderCookieTest = 4 }
+          $expected = @{ DesktopBackupStoreTest = 19; DesktopRecoveryJournalTest = 4; PortableProfileTest = 8; DesktopDownloaderCookieTest = 4 }
           foreach ($name in $expected.Keys) {
             $path = "shared/build/full-jvm-test-results/TEST-net.newpipe.app.platform.$name.xml"
             [xml]$report = Get-Content $path -Raw

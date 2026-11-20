@@ -64,6 +64,30 @@ class PortableProfileTest {
     }
 
     @Test
+    fun checksumRejectsSameLengthTamperingWithoutOverwritingFile() {
+        val file = File(Files.createTempDirectory("portable-tamper-").toFile(), "preferences.checked-json")
+        PortableFilePreferences(file).use { it.put("theme", "dark_theme") }
+        val bytes = file.readBytes()
+        bytes[bytes.lastIndex - 2] = 'X'.code.toByte()
+        file.writeBytes(bytes)
+        assertFailsWith<IllegalStateException> { PortableFilePreferences(file) }
+        assertTrue(file.readBytes().contentEquals(bytes))
+    }
+
+    @Test
+    fun failedPublicationLeavesLastGoodFileAndInMemorySettingsIntact() {
+        val file = File(Files.createTempDirectory("portable-write-failure-").toFile(), "preferences.checked-json")
+        PortableFilePreferences(file).use { it.put("theme", "old") }
+        val before = file.readBytes()
+        PortableFilePreferences(file, beforePublish = { throw java.io.IOException("simulated disk failure") }).use {
+            assertFailsWith<java.io.IOException> { it.put("theme", "new") }
+            assertEquals("old", it.get("theme", ""))
+            assertTrue(before.contentEquals(file.readBytes()))
+        }
+        PortableFilePreferences(file).use { assertEquals("old", it.get("theme", "")) }
+    }
+
+    @Test
     fun secondConcurrentInstanceIsRejected() {
         val file = File(Files.createTempDirectory("portable-lock-").toFile(), "preferences.checked-json")
         PortableFilePreferences(file).use {

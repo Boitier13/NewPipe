@@ -65,7 +65,7 @@ def main():
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsBundledRuntimeSmokeTest.kt'
     ]:
         assert (ROOT / path).read_bytes() == git('show', f'{portable_tip}:{path}'), f'Portable runtime work lost: {path}'
-    print('Arena runtime discovery, native playback changes, and tests preserved byte-for-byte; bundle script intentionally hardened in final audit.')
+    print('Historical VLC controller and test files preserved byte-for-byte; discovery paths, settings UI and bundle preparation intentionally evolved with dedicated tests.')
     print('PASS: frozen tips integrated and checked content preserved. This is not a build or UI test.')
 
 

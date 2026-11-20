@@ -2,6 +2,7 @@
 """Offline audit contracts. These checks are not a security scanner or Windows execution."""
 from pathlib import Path
 import re
+import json
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -49,6 +50,38 @@ class FinalAuditTests(unittest.TestCase):
                       'if: always()', 'test-windows-bundle-paths.ps1', ':desktopApp:packageExe',
                       ':desktopApp:packageMsi', 'WindowsBundledRuntimeSmokeTest']:
             self.assertIn(token, source)
+
+    def test_pinned_runtime_provenance_is_versioned_and_checked(self):
+        manifest = json.loads(self.text('.github/windows-runtimes.json'))
+        for name, item in manifest.items():
+            self.assertRegex(item['sha256'], r'^[a-f0-9]{64}$')
+            self.assertIn(item['version'], item['url'])
+            self.assertNotIn('/latest', item['url'])
+            self.assertTrue(item['url'].startswith('https://'))
+            self.assertIn('provenance', item)
+        script = self.text('.github/scripts/prepare-windows-bundle.ps1')
+        self.assertLess(script.index('Assert-RuntimeListing -Listing'), script.index('& $sevenZip x'))
+        self.assertIn("'COPYING.txt'", script)
+
+    def test_recovery_journal_precedes_substitution_and_blocks_initial_open(self):
+        script = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/DesktopBackupStore.kt')
+        self.assertLess(script.index('writeRecoveryState(work, "pending")'), script.index('closeDatabase()'))
+        self.assertIn('state != "completed"', script)
+        gateway = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/JVMDesktopDatabase.kt')
+        self.assertLess(gateway.index('assertNoPendingRecovery(dbFile)'), gateway.index('driver.open(dbFile.absolutePath)'))
+
+    def test_portable_mode_is_explicit_without_installed_profile_migration(self):
+        source = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/PortableProfile.kt')
+        for token in ['BOITIERTUBE_PORTABLE_ROOT', 'ATOMIC_MOVE', 'SHA-256', 'tryLock()', 'startsWith(data.canonicalFile.toPath())']:
+            self.assertIn(token, source)
+        self.assertNotIn('Preferences.userRoot()', source)
+        self.assertIn('setlocal', self.text('scripts/Start-BoitierTube-Portable.cmd'))
+
+    def test_runtime_settings_use_resources_instead_of_english_literals(self):
+        source = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/JVMPlayerSettingsSections.kt')
+        self.assertNotRegex(source, r'(?:title|summary) = "')
+        self.assertNotIn('VLC detected', source)
+        self.assertIn('stringResource', source)
 
     def test_backup_bounds_and_schema_precede_live_changes(self):
         source = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/DesktopBackupStore.kt')

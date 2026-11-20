@@ -40,7 +40,7 @@ object PortableProfile {
  * Each mutation is checksummed, forced, then atomically published. No non-atomic fallback:
  * unsupported/read-only USB filesystems must fail instead of risking the last good settings.
  */
-internal class PortableFilePreferences(private val file: File) : AbstractPreferences(null, ""), AutoCloseable {
+internal class PortableFilePreferences(private val file: File, private val beforePublish: () -> Unit = {}) : AbstractPreferences(null, ""), AutoCloseable {
     init { PortableProfile.resolve(file.parentFile, file.name) }
     private val lockChannel = FileChannel.open(PortableProfile.resolve(file.parentFile, ".portable-profile.lock").toPath(),
         StandardOpenOption.CREATE, StandardOpenOption.WRITE)
@@ -80,6 +80,7 @@ internal class PortableFilePreferences(private val file: File) : AbstractPrefere
             while (buffer.hasRemaining()) channel.write(buffer)
             channel.force(true)
         }
+        beforePublish()
         Files.move(temp, file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         values = next
     }
