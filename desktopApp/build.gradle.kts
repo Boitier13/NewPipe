@@ -46,7 +46,7 @@ compose.desktop {
                 shortcut = true
                 dirChooser = true
                 perUserInstall = true
-                upgradeUuid = "9a3d5a3e-6b4e-4d1c-9a51-202604010001"
+                upgradeUuid = "2e637c78-4bbc-4c83-8db5-0ec02e83a5e7"
                 iconFile.set(project.file("src/main/resources/boitiertube.ico"))
             }
         }

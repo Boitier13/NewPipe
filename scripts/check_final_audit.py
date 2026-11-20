@@ -118,6 +118,9 @@ class FinalAuditTests(unittest.TestCase):
 
     def test_profiles_never_open_legacy_installed_storage_or_root_preferences(self):
         paths = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/WindowsAppPaths.kt')
+        installer = self.text('desktopApp/build.gradle.kts')
+        self.assertNotIn('9a3d5a3e-6b4e-4d1c-9a51-202604010001', installer)
+        self.assertIn('2e637c78-4bbc-4c83-8db5-0ec02e83a5e7', installer)
         self.assertNotIn('NewPipeDesktop', paths)
         self.assertIn('File(appData, "BoitierTube")', paths)
         settings = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/di/settings/SettingsModule.kt')
