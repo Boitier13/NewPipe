@@ -8,7 +8,7 @@ Ne pas lancer depuis l’archive. Le dossier extrait doit être accessible en é
 - MSI/EXE installé (ou EXE lancé directement) : `%APPDATA%\BoitierTube` sous Windows.
 - Lanceur portable : `<dossier extrait>\data\profiles\<identifiant de compte>`.
 
-L’identifiant portable est une empreinte du dossier personnel et du nom de compte Windows. Deux
+L’identifiant portable est une empreinte du domaine/machine Windows, du dossier personnel et du nom de compte. Deux
 comptes distincts ne sélectionnent pas le même profil par défaut dans une même extraction. Cela
 n’est ni un chiffrement ni une protection contre quelqu’un ayant accès aux fichiers. Le même
 compte Windows partagé par deux personnes ne permet pas de les distinguer.

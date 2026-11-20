@@ -26,7 +26,7 @@ Aucun accès au PC utilisateur n’a été effectué pour lire son historique pr
 - Paramètres installés : fichier `preferences.checked-json` dans ce profil, avec le mécanisme
   transactionnel/observable déjà éprouvé en portable. Aucune lecture de la racine Java Preferences.
 - Portable : `<extraction>\data\profiles\<empreinte du compte>`. L’empreinte dépend du dossier
-  personnel canonique et du nom de compte. Les comptes distincts ne sélectionnent pas le même
+  personnel canonique, du domaine/machine Windows et du nom de compte. Les comptes distincts ne sélectionnent pas le même
   profil par défaut. Ce mécanisme n’est ni une authentification forte ni du chiffrement.
 - Aucun ancien `NewPipeDesktop`, `data/newpipe.db`, `data/preferences.checked-json` ou profil
   installé n’est recherché, importé, déplacé ou fusionné automatiquement par le nouveau portable.

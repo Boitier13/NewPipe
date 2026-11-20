@@ -18,7 +18,8 @@ object PortableProfile {
     fun dataDirectory(
         root: String? = System.getenv("BOITIERTUBE_PORTABLE_ROOT"),
         userHome: String = System.getProperty("user.home"),
-        userName: String = System.getProperty("user.name")
+        userName: String = System.getProperty("user.name"),
+        userDomain: String = System.getenv("USERDOMAIN") ?: System.getenv("HOSTNAME").orEmpty()
     ): File? {
         if (root == null) return null
         require(root.isNotBlank()) { "Le chemin du profil portable est vide." }
@@ -26,7 +27,7 @@ object PortableProfile {
         require(directory.isAbsolute && directory.isDirectory) { "Le dossier portable doit être un dossier absolu existant." }
         // No legacy data/ discovery or migration. Separate accounts even on a shared USB folder.
         require(userHome.isNotBlank() && userName.isNotBlank()) { "Impossible d’identifier le profil utilisateur." }
-        val identity = File(userHome).canonicalPath + "\u0000" + userName
+        val identity = userDomain + "\u0000" + File(userHome).canonicalPath + "\u0000" + userName
         val account = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 255) }
         return File(directory.canonicalFile, "data/profiles/$account").also {
