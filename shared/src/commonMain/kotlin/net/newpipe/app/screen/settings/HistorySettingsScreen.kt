@@ -45,7 +45,7 @@ import net.newpipe.app.screen.settings.model.HistoryMessage
 import net.newpipe.app.viewmodel.settings.HistorySettingsViewModel
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.cancel
-import newpipe.shared.generated.resources.clear_cookie_summary
+import newpipe.shared.generated.resources.desktop_clear_cookie_summary
 import newpipe.shared.generated.resources.clear_cookie_title
 import newpipe.shared.generated.resources.clear_playback_states_summary
 import newpipe.shared.generated.resources.clear_playback_states_title
@@ -256,7 +256,7 @@ fun HistorySettingsScreenContent(
             )
             PreferenceRow(
                 title = stringResource(Res.string.clear_cookie_title),
-                summary = stringResource(Res.string.clear_cookie_summary),
+                summary = stringResource(Res.string.desktop_clear_cookie_summary),
                 enabled = recaptchaCookiesPresent,
                 onClick = onClearRecaptchaCookies
             )

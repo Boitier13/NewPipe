@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="desktop_about_title">About BoitierTube</string>
+    <string name="desktop_about_description">BoitierTube is a desktop application for discovering, searching and playing online video content.\n\nIt offers a simple, smooth and accessible experience, with a modern, customizable interface designed for computers.\n\nBoitierTube emphasizes ease of use, comfortable navigation and user control.</string>
+    <string name="desktop_license_title">BoitierTube license</string>
+    <string name="desktop_license_description">BoitierTube is copyleft libre software: You can use, study, share, and improve it at will. Specifically you can redistribute and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.</string>
+    <string name="desktop_source_description">Source code, issue tracking and contributions.</string>
+    <string name="desktop_upstream_title">NewPipe — original project</string>
+    <string name="desktop_upstream_description">BoitierTube is derived from NewPipe. © NewPipe contributors and NewPipe e.V. Licensed under GPL-3.0-or-later. Dependency and Source Sans 3 licenses are available in the Licenses tab.</string>
+    <string name="desktop_subscription_import_description">BoitierTube does not connect directly to your Google account for privacy and security. To bring your YouTube subscriptions here:\n\n1. Open takeout.google.com and export YouTube → subscriptions (subscriptions.csv), or use a NewPipe subscriptions.json file.\n2. Click Choose File below to import all channels locally.</string>
+    <string name="desktop_system_theme">System</string>
+    <string name="desktop_clear_cookie_summary">Clear cookies stored by BoitierTube when you solve a reCAPTCHA</string>
+</resources>

@@ -38,7 +38,10 @@ import net.newpipe.app.theme.spaceLarge
 import net.newpipe.app.theme.spaceXSmall
 import net.newpipe.app.theme.spaceXXSmall
 import newpipe.shared.generated.resources.Res
-import newpipe.shared.generated.resources.app_description
+import newpipe.shared.generated.resources.desktop_about_description
+import newpipe.shared.generated.resources.desktop_source_description
+import newpipe.shared.generated.resources.desktop_upstream_description
+import newpipe.shared.generated.resources.desktop_upstream_title
 import newpipe.shared.generated.resources.ic_newpipe_logo
 import newpipe.shared.generated.resources.open_in_browser
 import newpipe.shared.generated.resources.view_on_github
@@ -90,13 +93,13 @@ fun AboutPageContent(
                 )
                 Text(
                     modifier = Modifier.fillMaxWidth(),
-                    text = stringResource(Res.string.app_description),
+                    text = stringResource(Res.string.desktop_about_description),
                     textAlign = TextAlign.Center
                 )
             }
         }
 
-        // Links about NewPipe
+        // Desktop source and required upstream attribution
         items(items = links, key = { link -> link.url }) { link ->
             LinkListItem(
                 link = link,
@@ -110,13 +113,13 @@ fun AboutPageContent(
 private fun defaultLinks() = listOf(
     Link(
         title = "BoitierTube Desktop",
-        description = "Code source, suivi du projet et contributions.",
+        description = stringResource(Res.string.desktop_source_description),
         action = stringResource(Res.string.view_on_github),
         url = "https://github.com/Boitier13/NewPipe"
     ),
     Link(
-        title = "NewPipe — projet original",
-        description = "BoitierTube est dérivé de NewPipe. © NewPipe contributors et NewPipe e.V. Licence GPL-3.0-or-later. Les licences des dépendances sont disponibles dans l’onglet Licences.",
+        title = stringResource(Res.string.desktop_upstream_title),
+        description = stringResource(Res.string.desktop_upstream_description),
         action = stringResource(Res.string.open_in_browser),
         url = Constants.URL_WEBSITE
     )

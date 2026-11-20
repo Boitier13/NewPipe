@@ -56,7 +56,7 @@ class DownloadSettingsScreenTest {
     }
 
     @Test
-    fun storageAccessFrameworkIsLockedWhenNotConfigurable() = runComposeUiTest {
+    fun androidStorageAccessFrameworkIsHiddenOnDesktop() = runComposeUiTest {
         withKoin(
             modules = listOf(emptySettings),
             content = {
@@ -64,9 +64,9 @@ class DownloadSettingsScreenTest {
             },
             onContent = {
                 onNodeWithText(getString(Res.string.downloads_storage_use_saf_summary_api_29))
-                    .assertIsDisplayed()
+                    .assertDoesNotExist()
                 onNodeWithText(getString(Res.string.downloads_storage_use_saf_title))
-                    .assertIsNotEnabled()
+                    .assertDoesNotExist()
             }
         )
     }

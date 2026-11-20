@@ -48,7 +48,7 @@ fun LicenseDialog(
     onDismiss: () -> Unit = {}
 ) {
     var licenseContent by remember { mutableStateOf<List<String>>(emptyList()) }
-    LaunchedEffect(key1 = Unit) {
+    LaunchedEffect(license.spdxID) {
         licenseContent = Res.readBytes("files/LICENSES/${license.spdxID}.txt")
             .decodeToString()
             .lines()

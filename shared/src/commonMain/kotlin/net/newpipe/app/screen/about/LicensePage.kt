@@ -43,8 +43,8 @@ import net.newpipe.app.theme.spaceXSmall
 import net.newpipe.app.theme.spaceXXSmall
 import net.newpipe.app.viewmodel.about.AboutViewModel
 import newpipe.shared.generated.resources.Res
-import newpipe.shared.generated.resources.app_license
-import newpipe.shared.generated.resources.app_license_title
+import newpipe.shared.generated.resources.desktop_license_description
+import newpipe.shared.generated.resources.desktop_license_title
 import newpipe.shared.generated.resources.read_full_license
 import newpipe.shared.generated.resources.title_licenses
 import org.jetbrains.compose.resources.stringResource
@@ -93,11 +93,11 @@ fun LicensePageContent(
                 verticalArrangement = Arrangement.spacedBy(spaceXSmall)
             ) {
                 Text(
-                    text = stringResource(Res.string.app_license_title),
+                    text = stringResource(Res.string.desktop_license_title),
                     style = MaterialTheme.typography.titleLarge
                 )
                 Text(
-                    text = stringResource(Res.string.app_license),
+                    text = stringResource(Res.string.desktop_license_description),
                     style = MaterialTheme.typography.bodyMedium
                 )
 
@@ -107,14 +107,27 @@ fun LicensePageContent(
                         .wrapContentWidth(Alignment.End),
                     onClick = {
                         licenseToShow = License(
-                            name = "NewPipe",
-                            website = "https://newpipe.net/",
+                            name = "BoitierTube",
+                            website = "https://github.com/Boitier13/NewPipe",
                             spdxID = "GPL-3.0-or-later"
                         )
                         shouldShowLicenseDialog = true
                     }
                 ) {
                     Text(text = stringResource(Res.string.read_full_license))
+                }
+
+                TextButton(
+                    onClick = {
+                        licenseToShow = License(
+                            name = "Source Sans 3 — Adobe",
+                            website = "https://github.com/adobe-fonts/source-sans",
+                            spdxID = "OFL-1.1"
+                        )
+                        shouldShowLicenseDialog = true
+                    }
+                ) {
+                    Text("Source Sans 3 — SIL Open Font License 1.1")
                 }
 
                 Text(

@@ -9,64 +9,31 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import com.russhwolf.settings.Settings
 import net.newpipe.app.Constants.KEY_STREAMING_SERVICE
 import org.koin.compose.koinInject
 
-val youTubeLightScheme = lightColorScheme(
-    primaryContainer = primaryContainerLight,
-    onPrimaryContainer = onPrimaryContainerLight
-)
+val youTubeLightScheme = lightScheme
 
-val youTubeDarkScheme = darkColorScheme(
-    primaryContainer = primaryContainerDark,
-    onPrimaryContainer = onPrimaryContainerDark
-)
+val youTubeDarkScheme = darkScheme
 
-val soundCloudLightScheme = lightColorScheme(
-    primaryContainer = primaryContainerLight,
-    onPrimaryContainer = onPrimaryContainerLight
-)
+val soundCloudLightScheme = lightScheme
 
-val soundCloudDarkScheme = darkColorScheme(
-    primaryContainer = primaryContainerDark,
-    onPrimaryContainer = onPrimaryContainerDark
-)
+val soundCloudDarkScheme = darkScheme
 
-val mediaCCCLightScheme = lightColorScheme(
-    primaryContainer = primaryContainerLight,
-    onPrimaryContainer = onPrimaryContainerLight
-)
+val mediaCCCLightScheme = lightScheme
 
-val mediaCCCDarkScheme = darkColorScheme(
-    primaryContainer = primaryContainerDark,
-    onPrimaryContainer = onPrimaryContainerDark
-)
+val mediaCCCDarkScheme = darkScheme
 
-val peerTubeLightScheme = lightColorScheme(
-    primaryContainer = primaryContainerLight,
-    onPrimaryContainer = onPrimaryContainerLight
-)
+val peerTubeLightScheme = lightScheme
 
-val peerTubeDarkScheme = darkColorScheme(
-    primaryContainer = primaryContainerDark,
-    onPrimaryContainer = onPrimaryContainerDark
-)
+val peerTubeDarkScheme = darkScheme
 
-val bandCampLightScheme = lightColorScheme(
-    primaryContainer = primaryContainerLight,
-    onPrimaryContainer = onPrimaryContainerLight
-)
+val bandCampLightScheme = lightScheme
 
-val bandCampDarkScheme = darkColorScheme(
-    primaryContainer = primaryContainerDark,
-    onPrimaryContainer = onPrimaryContainerDark
-)
+val bandCampDarkScheme = darkScheme
 
 /**
  * Supported services in the NewPipe app and minor information about them for UI decisions.

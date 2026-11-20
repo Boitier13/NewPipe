@@ -12,17 +12,18 @@ import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalInspectionMode
-import com.russhwolf.settings.Settings
-import org.koin.compose.koinInject
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalInspectionMode
 import com.russhwolf.settings.ObservableSettings
+import com.russhwolf.settings.Settings
 import net.newpipe.app.preferences.AppearancePreferences
+import org.koin.compose.koinInject
 
-private val lightScheme = lightColorScheme(
+internal val lightScheme = lightColorScheme(
     primary = primaryLight,
     onPrimary = onPrimaryLight,
     primaryContainer = primaryContainerLight,
@@ -60,7 +61,7 @@ private val lightScheme = lightColorScheme(
     surfaceContainerHighest = surfaceContainerHighestLight
 )
 
-private val darkScheme = darkColorScheme(
+internal val darkScheme = darkColorScheme(
     primary = primaryDark,
     onPrimary = onPrimaryDark,
     primaryContainer = primaryContainerDark,
@@ -98,12 +99,14 @@ private val darkScheme = darkColorScheme(
     surfaceContainerHighest = surfaceContainerHighestDark
 )
 
-// Legacy black-theme preferences remain readable, but use the charcoal desktop palette.
-private val blackScheme = darkScheme
+/** Pure selection logic shared by the desktop UI and theme regression tests. */
+internal fun resolveDesktopColorScheme(theme: String, systemDark: Boolean): ColorScheme = when (theme) {
+    AppearancePreferences.THEME_LIGHT -> lightScheme
+    AppearancePreferences.THEME_DARK, AppearancePreferences.THEME_BLACK -> darkScheme
+    else -> if (systemDark) darkScheme else lightScheme
+}
 
-/**
- * Gets current color scheme chosen by the user
- */
+/** Uses Compose's observable system theme and the existing persisted application preference. */
 @Composable
 fun currentColorScheme(
     useDarkTheme: Boolean = isSystemInDarkTheme(),
@@ -112,21 +115,7 @@ fun currentColorScheme(
     val theme = rememberSettingString(
         settings, AppearancePreferences.KEY_THEME, AppearancePreferences.DEFAULT_THEME
     )
-    val nightTheme = rememberSettingString(
-        settings, AppearancePreferences.KEY_NIGHT_THEME, AppearancePreferences.DEFAULT_NIGHT_THEME
-    )
-
-    val nightScheme = when (nightTheme) {
-        AppearancePreferences.THEME_BLACK -> blackScheme
-        else -> darkScheme
-    }
-
-    return when (theme) {
-        AppearancePreferences.THEME_LIGHT -> lightScheme
-        AppearancePreferences.THEME_DARK -> darkScheme
-        AppearancePreferences.THEME_BLACK -> blackScheme
-        else -> if (!useDarkTheme) lightScheme else nightScheme
-    }
+    return resolveDesktopColorScheme(theme, useDarkTheme)
 }
 
 /**
@@ -134,9 +123,7 @@ fun currentColorScheme(
  * edits made elsewhere (e.g. the Appearance screen) re-theme the Compose UI live via
  * recomposition
  *
- * This only covers Compose-rendered UI. Legacy Android Views screens are re-themed separately
- * (global AppCompatDelegate day/night mode + the KEY_THEME_CHANGE recreate flag consumed by
- * MainActivity.onResume), driven from AppearanceActions.applyThemeChange.
+ * Native OS menus are managed by the operating system; application pages use this theme.
  */
 @Composable
 private fun rememberSettingString(
@@ -144,10 +131,12 @@ private fun rememberSettingString(
     key: String,
     defaultValue: String
 ): String {
-    var value by remember(key) { mutableStateOf(settings.getString(key, defaultValue)) }
+    var value by remember(settings, key, defaultValue) {
+        mutableStateOf(settings.getString(key, defaultValue))
+    }
     val observable = settings as? ObservableSettings
     if (observable != null) {
-        DisposableEffect(key, observable) {
+        DisposableEffect(key, defaultValue, observable) {
             val listener = observable.addStringListener(key, defaultValue) { value = it }
             onDispose { listener.deactivate() }
         }

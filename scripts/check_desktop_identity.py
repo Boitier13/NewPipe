@@ -24,6 +24,79 @@ class DesktopIdentityTests(unittest.TestCase):
             self.assertNotIn('Android', strings['app_description'])
         self.assertEqual(strings['auto_device_theme_title'], 'Système')
 
+    def test_desktop_localization_falls_back_without_android_branding(self):
+        # These new keys intentionally have no inherited Android translations.
+        names = set()
+        for locale in ('values', 'values-fr'):
+            strings = {e.attrib['name']: e.text for e in ET.parse(RES / locale / 'desktop_identity.xml').getroot()}
+            names.update(strings)
+            for key in ('desktop_about_title', 'desktop_about_description', 'desktop_license_title', 'desktop_license_description'):
+                self.assertIn('BoitierTube', strings[key])
+                self.assertNotIn('Android', strings[key])
+            self.assertNotIn('NewPipe', strings['desktop_about_title'])
+            self.assertNotIn('NewPipe', strings['desktop_about_description'])
+        for path in RES.glob('values*/*.xml'):
+            if path.parent.name not in ('values', 'values-fr'):
+                self.assertFalse(names.intersection(e.attrib.get('name') for e in ET.parse(path).getroot()), path)
+
+    def test_desktop_screens_use_desktop_copy(self):
+        kotlin = ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app'
+        required = {
+            'screen/about/AboutPage.kt': ('desktop_about_description', 'desktop_upstream_description'),
+            'screen/about/AboutScreen.kt': ('desktop_about_title',),
+            'screen/about/LicensePage.kt': ('desktop_license_title', 'desktop_license_description'),
+            'screen/desktop/SubscriptionsScreen.kt': ('desktop_subscription_import_description',),
+            'screen/settings/HistorySettingsScreen.kt': ('desktop_clear_cookie_summary',)
+        }
+        for file, keys in required.items():
+            source = (kotlin / file).read_text()
+            for key in keys:
+                self.assertIn('Res.string.' + key, source, file)
+        source = (kotlin / 'screen/about/LicensePage.kt').read_text()
+        self.assertIn('spdxID = "OFL-1.1"', source)
+        self.assertEqual(
+            (RES / 'files/LICENSES/OFL-1.1.txt').read_bytes(),
+            (ROOT / 'shared/src/jvmMain/resources/licenses/source-sans-3-OFL.txt').read_bytes()
+        )
+
+    def test_no_stale_desktop_icon_references(self):
+        app = ROOT / 'desktopApp'
+        gradle = (app / 'build.gradle.kts').read_text()
+        main = (app / 'src/main/kotlin/net/newpipe/app/Main.kt').read_text()
+        self.assertIn('packageName = "BoitierTube"', gradle)
+        self.assertIn('menuGroup = "BoitierTube"', gradle)
+        self.assertIn('resources/boitiertube.ico', gradle)
+        self.assertIn('"/boitiertube.png"', main)
+        self.assertIn('title = "BoitierTube"', main)
+        for old in ('newpipe.png', 'newpipe.ico'):
+            self.assertNotIn(old, gradle + main)
+            self.assertFalse((app / 'src/main/resources' / old).exists())
+
+    def test_no_red_or_brown_accent_literals(self):
+        theme = ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/theme'
+        # Old brand roles and service colors, not semantic scrims or video blacks.
+        old_colors = ('CD201F', '904A45', 'FFDAD6', 'E53935', '992722', 'F57C00', 'A35300', 'FF6F00', 'A34700')
+        source = ''.join(p.read_text().upper() for p in theme.glob('*.kt'))
+        for color in old_colors:
+            self.assertNotIn('0XFF' + color, source)
+        service = (theme / 'ServiceTheme.kt').read_text()
+        self.assertNotIn('lightColorScheme(', service)
+        self.assertNotIn('darkColorScheme(', service)
+        for name in ('youTube', 'soundCloud', 'mediaCCC', 'peerTube', 'bandCamp'):
+            self.assertIn(f'val {name}LightScheme = lightScheme', service)
+            self.assertIn(f'val {name}DarkScheme = darkScheme', service)
+
+    def test_generated_string_references_have_defaults(self):
+        defaults = {
+            element.attrib['name']
+            for path in (RES / 'values').glob('*.xml')
+            for element in ET.parse(path).getroot()
+            if element.tag == 'string'
+        }
+        for path in (ROOT / 'shared/src').rglob('*.kt'):
+            used = set(re.findall(r'Res\.string\.(\w+)', path.read_text()))
+            self.assertFalse(used - defaults, f'{path}: missing {used - defaults}')
+
     def test_bundled_fonts_and_license(self):
         for name in ('regular', 'semibold'):
             data = (RES / f'font/source_sans_3_{name}.ttf').read_bytes()

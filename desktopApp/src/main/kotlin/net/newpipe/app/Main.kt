@@ -72,11 +72,11 @@ fun main() {
                     menu = {
                         Item("Afficher BoitierTube", onClick = { isWindowVisible = true })
                         Item(
-                            "Play / Pause",
+                            "Lecture / Pause",
                             onClick = { appController?.togglePlayPause?.invoke() }
                         )
                         Item(
-                            "Stop Playback",
+                            "Arrêter la lecture",
                             onClick = { appController?.stopPlayback?.invoke() }
                         )
                         Separator()

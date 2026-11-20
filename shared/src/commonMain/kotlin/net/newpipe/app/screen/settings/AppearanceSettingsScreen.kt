@@ -5,6 +5,7 @@
 
 package net.newpipe.app.screen.settings
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -27,16 +27,16 @@ import net.newpipe.app.composable.SwitchPreference
 import net.newpipe.app.composable.TopAppBar
 import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.platform.AppearanceActions
-import net.newpipe.app.preview.ThemePreviewProvider
 import net.newpipe.app.preferences.AppearancePreferences
+import net.newpipe.app.preview.ThemePreviewProvider
 import net.newpipe.app.viewmodel.settings.AppearanceSettingsViewModel
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.auto
-import newpipe.shared.generated.resources.auto_device_theme_title
 import newpipe.shared.generated.resources.caption_setting_description
 import newpipe.shared.generated.resources.caption_setting_title
 import newpipe.shared.generated.resources.card
 import newpipe.shared.generated.resources.dark_theme_title
+import newpipe.shared.generated.resources.desktop_system_theme
 import newpipe.shared.generated.resources.grid
 import newpipe.shared.generated.resources.light_theme_title
 import newpipe.shared.generated.resources.list
@@ -109,7 +109,7 @@ fun AppearanceSettingsScreenContent(
     val themeEntries = listOf(
         ListPreferenceEntry(AppearancePreferences.THEME_LIGHT, stringResource(Res.string.light_theme_title)),
         ListPreferenceEntry(AppearancePreferences.THEME_DARK, stringResource(Res.string.dark_theme_title)),
-        ListPreferenceEntry(AppearancePreferences.THEME_AUTO_DEVICE, stringResource(Res.string.auto_device_theme_title))
+        ListPreferenceEntry(AppearancePreferences.THEME_AUTO_DEVICE, stringResource(Res.string.desktop_system_theme))
     )
     val tabletModeEntries = listOf(
         ListPreferenceEntry(AppearancePreferences.TABLET_MODE_AUTO, stringResource(Res.string.auto)),

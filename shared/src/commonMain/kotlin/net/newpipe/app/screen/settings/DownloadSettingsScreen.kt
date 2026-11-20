@@ -65,7 +65,6 @@ import newpipe.shared.generated.resources.downloads_storage_ask_summary
 import newpipe.shared.generated.resources.downloads_storage_ask_summary_no_saf_notice
 import newpipe.shared.generated.resources.downloads_storage_ask_title
 import newpipe.shared.generated.resources.downloads_storage_use_saf_summary
-import newpipe.shared.generated.resources.downloads_storage_use_saf_summary_api_29
 import newpipe.shared.generated.resources.downloads_storage_use_saf_title
 import newpipe.shared.generated.resources.enable_queue_limit
 import newpipe.shared.generated.resources.enable_queue_limit_desc
@@ -204,15 +203,6 @@ fun DownloadSettingsScreenContent(
             stringResource(Res.string.downloads_storage_ask_summary_no_saf_notice)
         }
     }
-    val useStorageAccessFrameworkSummary = when {
-        storageAccessFrameworkConfigurable -> {
-            stringResource(Res.string.downloads_storage_use_saf_summary)
-        }
-
-        else -> {
-            stringResource(Res.string.downloads_storage_use_saf_summary_api_29)
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -237,13 +227,14 @@ fun DownloadSettingsScreenContent(
             )
 
             if (storageAvailable) {
-                SwitchPreference(
-                    title = stringResource(Res.string.downloads_storage_use_saf_title),
-                    summary = useStorageAccessFrameworkSummary,
-                    checked = useStorageAccessFramework,
-                    onCheckedChange = onUseStorageAccessFrameworkChange,
-                    enabled = storageAccessFrameworkConfigurable
-                )
+                if (storageAccessFrameworkConfigurable) {
+                    SwitchPreference(
+                        title = stringResource(Res.string.downloads_storage_use_saf_title),
+                        summary = stringResource(Res.string.downloads_storage_use_saf_summary),
+                        checked = useStorageAccessFramework,
+                        onCheckedChange = onUseStorageAccessFrameworkChange
+                    )
+                }
                 PreferenceRow(
                     title = stringResource(Res.string.download_path_title),
                     summary = videoDownloadFolder

@@ -66,7 +66,7 @@ import newpipe.shared.generated.resources.cancel
 import newpipe.shared.generated.resources.desktop_choose_file
 import newpipe.shared.generated.resources.desktop_feed_tab
 import newpipe.shared.generated.resources.desktop_import_subscriptions
-import newpipe.shared.generated.resources.desktop_import_subscriptions_desc
+import newpipe.shared.generated.resources.desktop_subscription_import_description
 import newpipe.shared.generated.resources.desktop_import_subscriptions_success
 import newpipe.shared.generated.resources.desktop_import_subscriptions_title
 import newpipe.shared.generated.resources.desktop_nav_subscriptions
@@ -309,7 +309,7 @@ fun SubscriptionsScreen(
         AlertDialog(
             onDismissRequest = { showImportDialog = false },
             title = { Text(stringResource(Res.string.desktop_import_subscriptions_title)) },
-            text = { Text(stringResource(Res.string.desktop_import_subscriptions_desc)) },
+            text = { Text(stringResource(Res.string.desktop_subscription_import_description)) },
             confirmButton = {
                 Button(onClick = pickSubscriptionsFile) {
                     Text(stringResource(Res.string.desktop_choose_file))
