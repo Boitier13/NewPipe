@@ -24,7 +24,7 @@ def check_name(name):
     if (leaf in PRIVATE_NAMES or path.suffix in PRIVATE_SUFFIXES or
             leaf.endswith(('.db-wal', '.db-shm', '.db-journal', '.log.old', '.checked-json')) or
             any(part in {'newpipedesktop', 'tmp_downloads', '.backup-recovery', 'profiles'} for part in path.parts) or
-            'data' in path.parts):
+            ('data' in path.parts and path.suffix != '.class')):
         raise ValueError(f'Possible personal data in distributable: {name}')
 
 

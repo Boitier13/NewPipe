@@ -16,7 +16,8 @@ class DistributionPrivacyTests(unittest.TestCase):
                 archive.writestr('BoitierTube/app/BoitierTube.cfg', '[JavaOptions]')
                 archive.writestr('BoitierTube/app/resources/vlc/COPYING.txt', 'GPL')
                 archive.writestr('BoitierTube/GUIDE.md', 'Guide')
-            self.assertEqual(3, audit(path))
+                archive.writestr('androidx/compose/foundation/text/contextmenu/data/TextContextMenuComponent.class', b'compiled code')
+            self.assertEqual(4, audit(path))
 
     def test_profiles_databases_cookies_media_and_logs_are_rejected(self):
         for name in ['data/profiles/account/newpipe.db', 'app/settings.json', 'app/private.sqlite',
