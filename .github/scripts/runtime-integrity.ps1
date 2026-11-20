@@ -8,3 +8,22 @@ function Assert-RuntimeArchive {
     $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -cne $Sha256) { throw 'SHA-256 mismatch; runtime archive must not be used' }
 }
+
+function Assert-RuntimeListing {
+    param([string]$Listing)
+    $sections = $Listing -split '(?m)^----------\r?$'
+    if ($sections.Count -lt 2) { throw 'Unrecognized 7-Zip listing' }
+    $entries = $sections[1]
+    $paths = @([regex]::Matches($entries, '(?m)^Path = (.+)\r?$'))
+    if ($paths.Count -lt 1 -or $paths.Count -gt 20000) { throw 'Invalid archive entry count' }
+    foreach ($match in $paths) {
+        $path = $match.Groups[1].Value.TrimEnd("`r")
+        if ($path -match '(^[\\/]|:|(^|[\\/])\.\.([\\/]|$))') { throw "Unsafe archive path: $path" }
+    }
+    if ($entries -match '(?m)^(Symbolic Link|Hard Link) = ') { throw 'Archive links are not allowed' }
+    [long]$expanded = 0
+    foreach ($match in [regex]::Matches($entries, '(?m)^Size = ([0-9]+)\r?$')) {
+        $expanded += [long]$match.Groups[1].Value
+        if ($expanded -gt 2GB) { throw 'Expanded runtime archive is too large' }
+    }
+}

@@ -94,6 +94,9 @@ foreach ($name in @('ffmpeg', 'vlc')) {
     Assert-RuntimeArchive -Path $archive -Sha256 $spec.sha256 -ExpectedSize $expectedSize
     & $sevenZip t $archive | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Corrupt $name archive" }
+    $listing = & $sevenZip l -slt $archive
+    if ($LASTEXITCODE -ne 0) { throw "Cannot inspect $name archive" }
+    Assert-RuntimeListing -Listing ($listing -join "`n")
     $extract = Join-Path $workDir "$name-extracted"
     & $sevenZip x $archive "-o$extract" -y | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Cannot extract $name archive" }

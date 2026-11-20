@@ -35,6 +35,18 @@ foreach ($case in @('checksum', 'truncated', 'empty')) {
     } catch { $rejected = $true }
     if (-not $rejected) { throw "Invalid archive accepted: $case" }
 }
+Assert-RuntimeListing -Listing "archive`n----------`nPath = runtime/bin/tool.exe`nSize = 23`n"
+foreach ($badListing in @(
+    "archive`n----------`nPath = ../escape.exe`nSize = 1`n",
+    "archive`n----------`nPath = C:\escape.exe`nSize = 1`n",
+    "archive`n----------`nPath = tool.exe:stream`nSize = 1`n",
+    "archive`n----------`nPath = link`nSymbolic Link = target`nSize = 1`n",
+    "archive`n----------`nPath = tool.exe`nSize = 3000000000`n"
+)) {
+    $rejected = $false
+    try { Assert-RuntimeListing -Listing $badListing } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Unsafe archive listing was accepted' }
+}
 Write-Host 'PASS: expected output accepted, arbitrary output rejected; hash validation rejects corrupt/incomplete fixtures.'
 
 # Actions propagates LASTEXITCODE: the last rejected child intentionally returned 1.
