@@ -7,8 +7,8 @@ package net.newpipe.app.di.settings
 
 import com.russhwolf.settings.ObservableSettings
 import com.russhwolf.settings.PreferencesSettings
-import java.io.Flushable
 import com.russhwolf.settings.Settings
+import java.io.Flushable
 import java.util.prefs.Preferences
 import org.koin.core.annotation.Singleton
 

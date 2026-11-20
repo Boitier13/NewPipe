@@ -3,6 +3,7 @@ package net.newpipe.app.platform
 
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
+import co.touchlab.kermit.Logger
 import com.russhwolf.settings.Settings
 import java.io.File
 import java.io.IOException
@@ -154,7 +155,7 @@ internal class DesktopBackupStore(
                 "Impossible de lire ou de préparer la sauvegarde. Vérifiez le fichier, les droits d’accès et l’espace disque. Les données existantes n’ont pas été remplacées.", error
             )
         } finally {
-            if (!preserveRecovery) work.deleteRecursively()
+            if (!preserveRecovery) cleanup(work)
         }
     }
 
@@ -206,8 +207,8 @@ internal class DesktopBackupStore(
                 "Impossible de créer la sauvegarde. Vérifiez les droits d’écriture et l’espace disque. La base reste disponible.", error
             )
         } finally {
-            partial?.delete()
-            work.deleteRecursively()
+            partial?.let(::cleanup)
+            cleanup(work)
         }
     }
 
@@ -396,6 +397,17 @@ internal class DesktopBackupStore(
             conn.prepare("PRAGMA foreign_key_check").use { statement ->
                 requireBackup(!statement.step(), "La base de la sauvegarde contient des données incohérentes.")
             }
+        }
+    }
+
+    /** Cleanup must not turn an already committed operation into a reported failure. */
+    private fun cleanup(file: File) {
+        try {
+            if (file.exists() && !file.deleteRecursively()) {
+                Logger.w { "Backup temporary files could not be removed: ${file.absolutePath}" }
+            }
+        } catch (error: Exception) {
+            Logger.w(error) { "Backup temporary file cleanup failed" }
         }
     }
 
