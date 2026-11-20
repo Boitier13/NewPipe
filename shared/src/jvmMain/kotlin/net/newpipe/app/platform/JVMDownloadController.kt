@@ -1464,14 +1464,14 @@ class JVMDownloadController(
 
         internal fun resolveTargetDirectoryForOpen(
             path: String,
-            fallbackDir: File = WindowsAppPaths.defaultVideoDownloadDir()
+            fallbackDir: File? = null
         ): File {
-            if (path.isBlank()) return fallbackDir
+            if (path.isBlank()) return fallbackDir ?: WindowsAppPaths.defaultVideoDownloadDir()
             val file = File(path)
             return when {
                 file.isDirectory -> file
                 file.parentFile != null -> file.parentFile
-                else -> fallbackDir
+                else -> fallbackDir ?: WindowsAppPaths.defaultVideoDownloadDir()
             }
         }
 

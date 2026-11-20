@@ -150,6 +150,10 @@ class VideoDetailViewModel(
 
     fun isFfmpegAvailable(): Boolean = downloadController.isFfmpegAvailable()
 
+    fun dismissTransientError(message: String) {
+        _uiState.update { if (it.errorMessage == message) it.copy(errorMessage = null) else it }
+    }
+
     fun downloadMp4(option: VideoStreamOption) {
         val details = _uiState.value.details ?: return
         viewModelScope.launch(Dispatchers.Default) {

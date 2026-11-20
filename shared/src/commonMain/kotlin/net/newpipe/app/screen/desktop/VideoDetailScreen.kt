@@ -155,6 +155,13 @@ fun VideoDetailScreen(
     val isDataSaver by viewModel.dataSaverController.isDataSaverEnabled.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.errorMessage) {
+        val message = state.errorMessage
+        if (message != null && state.details != null) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.dismissTransientError(message)
+        }
+    }
     val scope = rememberCoroutineScope()
     var showDownloadDialog by remember { mutableStateOf(false) }
 
