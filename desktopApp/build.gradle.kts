@@ -35,7 +35,7 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "BoitierTube"
             packageVersion = NEWPIPE_VERSION_NAME
-            description = "BoitierTube video desktop client for Windows"
+            description = "Lecteur video libre pour ordinateur"
             vendor = "BoitierTube"
             licenseFile.set(rootProject.file("LICENSE"))
             includeAllModules = true
