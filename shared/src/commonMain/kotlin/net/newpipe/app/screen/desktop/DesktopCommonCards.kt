@@ -104,13 +104,13 @@ fun StreamSummaryCard(
                 val badgeText = formatDurationSeconds(stream.durationSeconds, stream.isLive)
                 if (badgeText.isNotEmpty()) {
                     Surface(
-                        color = if (stream.isLive) MaterialTheme.colorScheme.error else Color.Black.copy(alpha = 0.8f),
+                        color = if (stream.isLive) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.8f),
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
                     ) {
                         Text(
                             text = badgeText,
-                            color = Color.White,
+                            color = if (stream.isLive) MaterialTheme.colorScheme.onPrimary else Color.White,
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )

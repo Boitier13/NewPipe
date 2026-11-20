@@ -86,6 +86,11 @@ class DesktopIdentityTests(unittest.TestCase):
             self.assertIn(f'val {name}LightScheme = lightScheme', service)
             self.assertIn(f'val {name}DarkScheme = darkScheme', service)
 
+    def test_live_badge_uses_contrasting_blue_roles(self):
+        source = (ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/screen/desktop/DesktopCommonCards.kt').read_text()
+        self.assertIn('if (stream.isLive) MaterialTheme.colorScheme.primary else Color.Black', source)
+        self.assertIn('if (stream.isLive) MaterialTheme.colorScheme.onPrimary else Color.White', source)
+
     def test_generated_string_references_have_defaults(self):
         defaults = {
             element.attrib['name']
