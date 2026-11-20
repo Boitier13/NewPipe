@@ -124,5 +124,15 @@
     <string name="desktop_accessibility_play">Lire</string>
     <string name="desktop_accessibility_cancel">Annuler le téléchargement</string>
     <string name="desktop_accessibility_remove">Retirer de la liste</string>
+    <string name="desktop_accessibility_delete">Supprimer</string>
+    <string name="desktop_accessibility_back">Retour</string>
+    <string name="desktop_accessibility_refresh">Actualiser</string>
+    <string name="desktop_accessibility_reload">Recharger</string>
+    <string name="desktop_accessibility_play_pause">Lire ou mettre en pause</string>
+    <string name="desktop_accessibility_mute">Couper ou rétablir le son</string>
+    <string name="desktop_accessibility_fullscreen">Plein écran</string>
+    <string name="desktop_accessibility_resume">Reprendre à %1$s</string>
+    <string name="desktop_accessibility_settings">Paramètres</string>
+    <string name="desktop_accessibility_detect_vlc">Détecter VLC à nouveau</string>
     <string name="desktop_import_subscriptions_success">%1$d abonnement(s) importé(s).</string>
 </resources>
