@@ -27,8 +27,8 @@ def catalog(path, ref=None):
 
 
 def main():
-    inventory = json.loads((ROOT / 'doc/boitiertube-branch-inventory.json').read_text())
-    decisions = json.loads((ROOT / 'doc/boitiertube-integration-resolutions.json').read_text())
+    inventory = json.loads((ROOT / 'doc/boitiertube-branch-inventory.json').read_text(encoding='utf-8'))
+    decisions = json.loads((ROOT / 'doc/boitiertube-integration-resolutions.json').read_text(encoding='utf-8'))
     for branch in inventory['branches']:
         subprocess.run(['git', 'merge-base', '--is-ancestor', branch['tip'], 'HEAD'], cwd=ROOT, check=True)
         print(f"Integrated ancestor: {branch['name']} ({branch['tip'][:10]})")

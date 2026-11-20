@@ -27,7 +27,7 @@ class DesktopIdentityTests(unittest.TestCase):
 
     def test_appearance_screen_imports_compose_delegate_operator(self):
         path = ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/screen/settings/AppearanceSettingsScreen.kt'
-        self.assertIn('import androidx.compose.runtime.getValue', path.read_text())
+        self.assertIn('import androidx.compose.runtime.getValue', path.read_text(encoding='utf-8'))
 
     def test_desktop_copy(self):
         for locale in ('values', 'values-fr'):
@@ -62,10 +62,10 @@ class DesktopIdentityTests(unittest.TestCase):
             'screen/settings/HistorySettingsScreen.kt': ('desktop_clear_cookie_summary',)
         }
         for file, keys in required.items():
-            source = (kotlin / file).read_text()
+            source = (kotlin / file).read_text(encoding='utf-8')
             for key in keys:
                 self.assertIn('Res.string.' + key, source, file)
-        source = (kotlin / 'screen/about/LicensePage.kt').read_text()
+        source = (kotlin / 'screen/about/LicensePage.kt').read_text(encoding='utf-8')
         self.assertIn('spdxID = "OFL-1.1"', source)
         self.assertEqual(
             (RES / 'files/LICENSES/OFL-1.1.txt').read_bytes(),
@@ -74,8 +74,8 @@ class DesktopIdentityTests(unittest.TestCase):
 
     def test_no_stale_desktop_icon_references(self):
         app = ROOT / 'desktopApp'
-        gradle = (app / 'build.gradle.kts').read_text()
-        main = (app / 'src/main/kotlin/net/newpipe/app/Main.kt').read_text()
+        gradle = (app / 'build.gradle.kts').read_text(encoding='utf-8')
+        main = (app / 'src/main/kotlin/net/newpipe/app/Main.kt').read_text(encoding='utf-8')
         self.assertIn('packageName = "BoitierTube"', gradle)
         self.assertIn('menuGroup = "BoitierTube"', gradle)
         self.assertIn('resources/boitiertube.ico', gradle)
@@ -90,10 +90,10 @@ class DesktopIdentityTests(unittest.TestCase):
         theme = ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/theme'
         # Old brand roles and service colors, not semantic scrims or video blacks.
         old_colors = ('CD201F', '904A45', 'FFDAD6', 'E53935', '992722', 'F57C00', 'A35300', 'FF6F00', 'A34700')
-        source = ''.join(p.read_text().upper() for p in theme.glob('*.kt'))
+        source = ''.join(p.read_text(encoding='utf-8').upper() for p in theme.glob('*.kt'))
         for color in old_colors:
             self.assertNotIn('0XFF' + color, source)
-        service = (theme / 'ServiceTheme.kt').read_text()
+        service = (theme / 'ServiceTheme.kt').read_text(encoding='utf-8')
         self.assertNotIn('lightColorScheme(', service)
         self.assertNotIn('darkColorScheme(', service)
         for name in ('youTube', 'soundCloud', 'mediaCCC', 'peerTube', 'bandCamp'):
@@ -101,7 +101,7 @@ class DesktopIdentityTests(unittest.TestCase):
             self.assertIn(f'val {name}DarkScheme = darkScheme', service)
 
     def test_live_badge_uses_contrasting_blue_roles(self):
-        source = (ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/screen/desktop/DesktopCommonCards.kt').read_text()
+        source = (ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/screen/desktop/DesktopCommonCards.kt').read_text(encoding='utf-8')
         self.assertIn('if (stream.isLive) MaterialTheme.colorScheme.primary else Color.Black', source)
         self.assertIn('if (stream.isLive) MaterialTheme.colorScheme.onPrimary else Color.White', source)
 
@@ -113,7 +113,7 @@ class DesktopIdentityTests(unittest.TestCase):
             if element.tag == 'string'
         }
         for path in (ROOT / 'shared/src').rglob('*.kt'):
-            used = set(re.findall(r'Res\.string\.(\w+)', path.read_text()))
+            used = set(re.findall(r'Res\.string\.(\w+)', path.read_text(encoding='utf-8')))
             self.assertFalse(used - defaults, f'{path}: missing {used - defaults}')
 
     def test_bundled_fonts_and_license(self):
@@ -121,7 +121,7 @@ class DesktopIdentityTests(unittest.TestCase):
             data = (RES / f'font/source_sans_3_{name}.ttf').read_bytes()
             self.assertEqual(data[:4], b'\x00\x01\x00\x00')
             self.assertGreater(len(data), 10000)
-        license_text = (ROOT / 'shared/src/jvmMain/resources/licenses/source-sans-3-OFL.txt').read_text()
+        license_text = (ROOT / 'shared/src/jvmMain/resources/licenses/source-sans-3-OFL.txt').read_text(encoding='utf-8')
         self.assertIn('SIL OPEN FONT LICENSE Version 1.1', license_text)
 
     def test_windows_icon_frames_and_png(self):
@@ -140,7 +140,7 @@ class DesktopIdentityTests(unittest.TestCase):
         self.assertEqual(png, (RES / 'drawable/ic_newpipe_logo.png').read_bytes())
 
     def test_palette_contrast(self):
-        source = (ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/theme/Color.kt').read_text()
+        source = (ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app/theme/Color.kt').read_text(encoding='utf-8')
         colors = dict(re.findall(r'val (\w+) = Color\(0xFF([0-9A-F]{6})\)', source))
 
         def luminance(hex_color):
