@@ -94,7 +94,6 @@ import newpipe.shared.generated.resources.desktop_accessibility_reload
 import newpipe.shared.generated.resources.desktop_accessibility_detect_vlc
 import newpipe.shared.generated.resources.desktop_accessibility_settings
 import newpipe.shared.generated.resources.desktop_accessibility_play
-import newpipe.shared.generated.resources.desktop_accessibility_play_pause
 import newpipe.shared.generated.resources.desktop_accessibility_mute
 import newpipe.shared.generated.resources.desktop_accessibility_fullscreen
 import newpipe.shared.generated.resources.desktop_audio_format
@@ -694,7 +693,7 @@ private fun DesktopPlayerControlsBar(
                         painterResource(
                             if (playerState.isPlaying) Res.drawable.ic_pause else Res.drawable.ic_play_arrow
                         ),
-                        contentDescription = stringResource(Res.string.desktop_accessibility_play_pause)
+                        contentDescription = stringResource(if (playerState.isPlaying) Res.string.desktop_accessibility_pause else Res.string.desktop_accessibility_play)
                     )
                 }
                 IconButton(onClick = { viewModel.mediaPlayerController.seekBy(10_000L) }) {
