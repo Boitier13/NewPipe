@@ -18,6 +18,7 @@ on:
     branches:
       - dev
       - master
+      - arena/1461b4cf-newpipe
     paths-ignore:
       - 'README.md'
       - 'doc/**'

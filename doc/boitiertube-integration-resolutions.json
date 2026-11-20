@@ -1,0 +1,185 @@
+{
+  "french_backup_overlap": [
+    {
+      "key": "could_not_import_all_files",
+      "french_branch": "Attention : certains fichiers n’ont pas pu être importés.",
+      "backup_branch": "La restauration n’a pas pu être effectuée intégralement.",
+      "central": "Attention : certains fichiers n’ont pas pu être importés.",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "error_snackbar_action",
+      "french_branch": "Signaler",
+      "backup_branch": "Détails",
+      "central": "Détails",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "export_complete_toast",
+      "french_branch": "Exportation terminée",
+      "backup_branch": "La sauvegarde a été créée.",
+      "central": "Exportation terminée",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "export_data_summary",
+      "french_branch": "Exporter l’historique, les abonnements, les listes de lecture et les paramètres.",
+      "backup_branch": "Enregistrer la base de données et les paramètres dans une nouvelle archive ZIP.",
+      "central": "Exporter l’historique, les abonnements, les listes de lecture et les paramètres.",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "export_data_title",
+      "french_branch": "Exporter la base de données",
+      "backup_branch": "Créer une sauvegarde",
+      "central": "Exporter la base de données",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "export_subscriptions_summary",
+      "french_branch": "Exporter vos abonnements dans un fichier .json",
+      "backup_branch": "Enregistrer les abonnements dans un fichier JSON.",
+      "central": "Exporter vos abonnements dans un fichier .json",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "export_subscriptions_title",
+      "french_branch": "Exporter les abonnements",
+      "backup_branch": "Exporter les abonnements",
+      "central": "Exporter les abonnements",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "import_data_summary",
+      "french_branch": "Remplace l’historique, les abonnements, les listes de lecture et, éventuellement, les paramètres actuels.",
+      "backup_branch": "Restaurer la base de données et les paramètres depuis une sauvegarde compatible.",
+      "central": "Remplace l’historique, les abonnements, les listes de lecture et les paramètres actuels après validation complète de la sauvegarde.",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "import_data_title",
+      "french_branch": "Importer la base de données",
+      "backup_branch": "Restaurer une sauvegarde",
+      "central": "Importer la base de données",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "import_network_expensive_warning",
+      "french_branch": "Cette opération peut consommer beaucoup de données Internet.\\n\\nVoulez-vous continuer ?",
+      "backup_branch": "L’importation des abonnements peut entraîner des accès au réseau. Voulez-vous continuer ?",
+      "central": "Cette opération peut consommer beaucoup de données Internet.\\n\\nVoulez-vous continuer ?",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "import_settings",
+      "french_branch": "Souhaitez-vous également importer les paramètres ?",
+      "backup_branch": "Restaurer les paramètres",
+      "central": "Restaurer les paramètres",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "import_settings_vulnerable_format",
+      "french_branch": "Les paramètres du fichier importé utilisent un format vulnérable, abandonné depuis NewPipe 0.27.0. Assurez-vous que le fichier provient d’une source fiable et privilégiez désormais les exportations réalisées avec NewPipe 0.27.0 ou une version plus récente. La prise en charge de ce format sera bientôt supprimée.",
+      "backup_branch": "Cette ancienne sauvegarde utilise un format de paramètres non pris en charge pour une restauration sécurisée. Utilisez une sauvegarde JSON compatible.",
+      "central": "Cette ancienne sauvegarde utilise un format de paramètres non pris en charge pour une restauration sécurisée. Utilisez une sauvegarde JSON compatible.",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "import_subscriptions_summary",
+      "french_branch": "Importer des abonnements depuis un ancien fichier d’exportation .json",
+      "backup_branch": "Importer un fichier d’abonnements compatible.",
+      "central": "Importer des abonnements depuis un ancien fichier d’exportation .json",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "import_subscriptions_title",
+      "french_branch": "Importer des abonnements",
+      "backup_branch": "Importer les abonnements",
+      "central": "Importer des abonnements",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "no_app_to_open_intent",
+      "french_branch": "Aucune application sur votre appareil ne peut ouvrir ce fichier.",
+      "backup_branch": "Impossible d’ouvrir le sélecteur de fichiers",
+      "central": "Impossible d’ouvrir le sélecteur de fichiers",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "no_appropriate_file_manager_message",
+      "french_branch": "Aucun gestionnaire de fichiers adapté n’a été trouvé pour cette action.\\nInstallez un gestionnaire de fichiers ou désactivez « %1$s » dans les paramètres de téléchargement.",
+      "backup_branch": "Impossible d’ouvrir le sélecteur de fichiers. Vérifiez les autorisations de l’application.",
+      "central": "Impossible d’ouvrir le sélecteur de fichiers. Vérifiez les autorisations de l’application.",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "no_appropriate_file_manager_message_android_10",
+      "french_branch": "Aucun gestionnaire de fichiers adapté n’a été trouvé pour cette action.\\nInstallez un gestionnaire de fichiers compatible avec le Storage Access Framework.",
+      "backup_branch": "Impossible d’ouvrir le sélecteur de fichiers. Vérifiez les autorisations de l’application.",
+      "central": "Impossible d’ouvrir le sélecteur de fichiers. Vérifiez les autorisations de l’application.",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "no_valid_zip_file",
+      "french_branch": "Aucun fichier ZIP valide",
+      "backup_branch": "Ce fichier ne contient pas une sauvegarde compatible.",
+      "central": "Aucun fichier ZIP valide",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "ok",
+      "french_branch": "OK",
+      "backup_branch": "OK",
+      "central": "OK",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "override_current_data",
+      "french_branch": "Cette opération remplacera vos données actuelles.",
+      "backup_branch": "Restaurer cette sauvegarde remplacera les données et les paramètres actuels après vérification. Voulez-vous continuer ?",
+      "central": "Restaurer cette sauvegarde remplacera les données et les paramètres actuels après vérification. Voulez-vous continuer ?",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "reset_all_settings",
+      "french_branch": "La réinitialisation supprimera tous vos paramètres personnalisés et redémarrera l’application.\\n\\nVoulez-vous vraiment continuer ?",
+      "backup_branch": "Voulez-vous réinitialiser tous les paramètres ?",
+      "central": "Voulez-vous réinitialiser tous les paramètres ?",
+      "reason": "transactional backup semantics / Desktop instead of Android"
+    },
+    {
+      "key": "reset_settings_summary",
+      "french_branch": "Rétablir tous les paramètres par défaut.",
+      "backup_branch": "Rétablir les paramètres par défaut.",
+      "central": "Rétablir tous les paramètres par défaut.",
+      "reason": "preserved French branch wording"
+    },
+    {
+      "key": "reset_settings_title",
+      "french_branch": "Réinitialiser les paramètres",
+      "backup_branch": "Réinitialiser les paramètres",
+      "central": "Réinitialiser les paramètres",
+      "reason": "preserved French branch wording"
+    }
+  ],
+  "added_default_keys": [
+    "desktop_accessibility_back",
+    "desktop_accessibility_cancel",
+    "desktop_accessibility_clear",
+    "desktop_accessibility_delete",
+    "desktop_accessibility_detect_vlc",
+    "desktop_accessibility_fullscreen",
+    "desktop_accessibility_mute",
+    "desktop_accessibility_pause",
+    "desktop_accessibility_play",
+    "desktop_accessibility_refresh",
+    "desktop_accessibility_reload",
+    "desktop_accessibility_remove",
+    "desktop_accessibility_remove_item",
+    "desktop_accessibility_resume",
+    "desktop_accessibility_search",
+    "desktop_accessibility_settings",
+    "desktop_accessibility_stop",
+    "desktop_accessibility_unsubscribe"
+  ]
+}

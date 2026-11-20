@@ -16,6 +16,15 @@ class DesktopIdentityTests(unittest.TestCase):
             with self.subTest(path=path.relative_to(RES)):
                 ET.parse(path)
 
+    def test_resource_keys_are_unique_per_locale(self):
+        for folder in RES.glob('values*'):
+            keys = set()
+            for path in folder.glob('*.xml'):
+                for node in ET.parse(path).getroot():
+                    key = (node.tag, node.attrib.get('name'))
+                    self.assertNotIn(key, keys, f'{folder}: {key}')
+                    keys.add(key)
+
     def test_desktop_copy(self):
         for locale in ('values', 'values-fr'):
             strings = {e.attrib['name']: e.text for e in ET.parse(RES / locale / 'strings.xml').getroot() if e.tag == 'string'}
