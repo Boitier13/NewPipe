@@ -46,7 +46,14 @@ jobs:
           cache: 'gradle'
 
       - name: Check desktop identity resources
-        run: python scripts/check_desktop_identity.py
+        run: |
+          python scripts/check_desktop_identity.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/check_final_audit.py
+
+      - name: Audit bundle path safeguards
+        shell: pwsh
+        run: ./scripts/test-windows-bundle-paths.ps1
 
       - name: Download portable FFmpeg and VLC for Windows bundle
         shell: pwsh
@@ -161,3 +168,31 @@ jobs:
           path: |
             desktopApp/build/compose/binaries/main/msi/*.msi
             desktopApp/build/compose/binaries/main/exe/*.exe
+
+      - name: Archive runnable Windows distribution
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $appDir = "desktopApp/build/compose/binaries/main/app/BoitierTube"
+          if (-not (Test-Path "$appDir/BoitierTube.exe")) { throw "Missing distribution launcher" }
+          Compress-Archive -Path $appDir -DestinationPath "desktopApp/build/BoitierTube-windows-x64.zip"
+          Get-FileHash "desktopApp/build/BoitierTube-windows-x64.zip" -Algorithm SHA256 | Format-List
+
+      - name: Upload runnable Windows ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: boitiertube-windows-portable
+          if-no-files-found: error
+          path: desktopApp/build/BoitierTube-windows-x64.zip
+
+      - name: Upload JVM and desktop test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: boitiertube-test-reports
+          if-no-files-found: warn
+          path: |
+            shared/build/test-results/**
+            shared/build/reports/tests/**
+            desktopApp/build/test-results/**
+            desktopApp/build/reports/tests/**

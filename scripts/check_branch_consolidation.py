@@ -63,14 +63,13 @@ def main():
 
     portable_tip = next(b['tip'] for b in inventory['branches'] if b['name'] == 'arena/ae9cabd8-newpipe')
     for path in [
-        '.github/scripts/prepare-windows-bundle.ps1',
         platform + 'WindowsAppPaths.kt', platform + 'VlcMediaPlayerController.kt',
         platform + 'JVMPlayerSettingsSections.kt',
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsAppPathsTest.kt',
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsBundledRuntimeSmokeTest.kt'
     ]:
         assert (ROOT / path).read_bytes() == git('show', f'{portable_tip}:{path}'), f'Portable runtime work lost: {path}'
-    print('Arena runtime discovery, native playback changes, bundle preparation and tests preserved byte-for-byte.')
+    print('Arena runtime discovery, native playback changes, and tests preserved byte-for-byte; bundle script intentionally hardened in final audit.')
     print('PASS: frozen tips integrated and checked content preserved. This is not a build or UI test.')
 
 

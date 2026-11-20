@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDir = "desktopApp/app-resources/windows-x64"
+    [string]$OutputDir = "desktopApp/app-resources/windows-x64",
+    [switch]$ValidatePathsOnly
 )
 
 Set-StrictMode -Version Latest
@@ -27,6 +28,33 @@ function Invoke-WithRetry {
     }
 }
 
+# This script removes generated output. Never accept arbitrary user directories, even
+# when invoked from another working directory. Reject junctions/symlinks in ancestors.
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+$expectedOut = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot "desktopApp/app-resources/windows-x64"))
+$resolvedOut = if ([System.IO.Path]::IsPathRooted($OutputDir)) {
+    [System.IO.Path]::GetFullPath($OutputDir)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDir))
+}
+if (-not [string]::Equals($resolvedOut, $expectedOut, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "OutputDir must be the generated directory: $expectedOut"
+}
+$ancestor = $resolvedOut
+while ($ancestor) {
+    if (Test-Path -LiteralPath $ancestor) {
+        $item = Get-Item -LiteralPath $ancestor -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Refusing linked output directory or ancestor: $ancestor"
+        }
+    }
+    $ancestor = [System.IO.Path]::GetDirectoryName($ancestor)
+}
+if ($ValidatePathsOnly) {
+    Write-Host "Bundle output path validated without writing files: $resolvedOut"
+    return
+}
+
 $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1)
 if (-not $sevenZip -and (Test-Path "C:\Program Files\7-Zip\7z.exe")) {
     $sevenZip = "C:\Program Files\7-Zip\7z.exe"
@@ -36,7 +64,6 @@ if (-not $sevenZip) {
 }
 Write-Host "Using 7-Zip: $sevenZip"
 
-$resolvedOut = [System.IO.Path]::GetFullPath($OutputDir)
 $ffmpegDest = Join-Path $resolvedOut "ffmpeg"
 $vlcDest = Join-Path $resolvedOut "vlc"
 if (Test-Path $resolvedOut) {
@@ -45,10 +72,8 @@ if (Test-Path $resolvedOut) {
 New-Item -ItemType Directory -Force -Path $ffmpegDest, $vlcDest | Out-Null
 
 $workBase = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
-$workDir = Join-Path $workBase "newpipe-win-bundle"
-if (Test-Path $workDir) {
-    Remove-Item -Recurse -Force $workDir
-}
+# A unique workspace avoids deleting another build's or user's temporary directory.
+$workDir = Join-Path $workBase ("boitiertube-win-bundle-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $workDir | Out-Null
 
 try {
