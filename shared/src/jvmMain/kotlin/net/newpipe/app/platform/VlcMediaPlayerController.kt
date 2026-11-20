@@ -123,6 +123,7 @@ class VlcMediaPlayerController(
     private val discoveryAttempted = AtomicBoolean(false)
     private val playbackTransitioning = AtomicBoolean(false)
     private val playbackGeneration = AtomicLong(0L)
+    private val playbackRequestedAt = AtomicLong(0L)
 
     private val bufferFormatCallback = object : BufferFormatCallbackAdapter() {
         override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
@@ -207,7 +208,7 @@ class VlcMediaPlayerController(
     private fun ensureVlcDiscovered(): Boolean {
         if (discoveryAttempted.compareAndSet(false, true)) {
             val customPath = settings.getString(DesktopPreferences.KEY_VLC_PATH, "")
-            val found = discoverVlc(customPath).discovered
+            val found = PlaybackDiagnostics.time("vlc_detection") { discoverVlc(customPath).discovered }
             _state.update {
                 it.copy(
                     vlcAvailable = found,
@@ -224,7 +225,7 @@ class VlcMediaPlayerController(
 
         return synchronized(videoLock) {
             videoComponent ?: runCatching {
-                val comp = CallbackMediaPlayerComponent(
+                val comp = PlaybackDiagnostics.time("vlc_creation_video") { CallbackMediaPlayerComponent(
                     null,
                     null,
                     InputEvents.NONE,
@@ -232,7 +233,7 @@ class VlcMediaPlayerController(
                     renderCallback,
                     bufferFormatCallback,
                     null
-                )
+                ) }
                 attachListeners(comp.mediaPlayer(), PlayerPlaybackMode.VIDEO)
                 videoComponent = comp
                 comp
@@ -253,7 +254,7 @@ class VlcMediaPlayerController(
         audioComponent?.let { return it }
         return synchronized(audioLock) {
             audioComponent ?: runCatching {
-                val comp = AudioPlayerComponent()
+                val comp = PlaybackDiagnostics.time("vlc_creation_audio") { AudioPlayerComponent() }
                 attachListeners(comp.mediaPlayer(), PlayerPlaybackMode.BACKGROUND_AUDIO)
                 audioComponent = comp
                 comp
@@ -278,6 +279,7 @@ class VlcMediaPlayerController(
             }
 
             override fun playing(mp: MediaPlayer) {
+                PlaybackDiagnostics.elapsed("vlc_demande_vers_lecture", playbackRequestedAt.getAndSet(0L))
                 playbackTransitioning.set(false)
                 if (_state.value.mode == componentMode) {
                     _state.update {
@@ -572,6 +574,7 @@ class VlcMediaPlayerController(
         mode: PlayerPlaybackMode,
         startPositionMs: Long
     ) {
+        playbackRequestedAt.set(System.nanoTime())
         val gen = playbackGeneration.incrementAndGet()
         vlcExecutor.execute {
             if (playbackGeneration.get() != gen) return@execute

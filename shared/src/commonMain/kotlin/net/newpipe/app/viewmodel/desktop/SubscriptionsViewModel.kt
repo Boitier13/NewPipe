@@ -58,7 +58,7 @@ class SubscriptionsViewModel(
                 }
                 .onFailure { err ->
                     _feedState.update {
-                        it.copy(importCount = null, importError = err.message ?: "Import failed")
+                        it.copy(importCount = null, importError = "Impossible d’importer les abonnements. Choisissez le fichier subscriptions.csv extrait de Takeout ou un export JSON compatible.")
                     }
                 }
         }
@@ -87,7 +87,7 @@ class SubscriptionsViewModel(
                 it.copy(
                     feedVideos = fetched.distinctBy { item -> item.url },
                     isRefreshing = false,
-                    statusMessage = if (fetched.isEmpty()) "No videos fetched" else null
+                    statusMessage = if (fetched.isEmpty()) "Aucune vidéo récupérée. Vérifiez la connexion et actualisez le flux." else null
                 )
             }
         }

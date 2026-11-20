@@ -108,7 +108,6 @@ fun LicensePageContent(
                     onClick = {
                         licenseToShow = License(
                             name = "BoitierTube",
-                            website = "https://github.com/Boitier13/NewPipe",
                             spdxID = "GPL-3.0-or-later"
                         )
                         shouldShowLicenseDialog = true

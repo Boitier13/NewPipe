@@ -151,17 +151,23 @@ class VideoDetailViewModel(
 
     fun downloadMp4(option: VideoStreamOption) {
         val details = _uiState.value.details ?: return
-        downloadController.enqueueMp4(details, option)
+        runCatching { downloadController.enqueueMp4(details, option) }.onFailure {
+            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        }
     }
 
     fun downloadMp3(option: AudioStreamOption, targetBitrateKbps: Int? = null) {
         val details = _uiState.value.details ?: return
-        downloadController.enqueueMp3(details, option, targetBitrateKbps)
+        runCatching { downloadController.enqueueMp3(details, option, targetBitrateKbps) }.onFailure {
+            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        }
     }
 
     fun downloadNativeAudio(option: AudioStreamOption, targetBitrateKbps: Int? = null) {
         val details = _uiState.value.details ?: return
-        downloadController.enqueueNativeAudio(details, option, targetBitrateKbps)
+        runCatching { downloadController.enqueueNativeAudio(details, option, targetBitrateKbps) }.onFailure {
+            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        }
     }
 
     fun downloadAudio(
@@ -170,6 +176,8 @@ class VideoDetailViewModel(
         targetBitrateKbps: Int? = null
     ) {
         val details = _uiState.value.details ?: return
-        downloadController.enqueueAudio(details, option, format, targetBitrateKbps)
+        runCatching { downloadController.enqueueAudio(details, option, format, targetBitrateKbps) }.onFailure {
+            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        }
     }
 }

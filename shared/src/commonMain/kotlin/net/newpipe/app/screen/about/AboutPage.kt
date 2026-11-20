@@ -41,12 +41,10 @@ import net.newpipe.app.theme.spaceXSmall
 import net.newpipe.app.theme.spaceXXSmall
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.desktop_about_description
-import newpipe.shared.generated.resources.desktop_source_description
 import newpipe.shared.generated.resources.desktop_upstream_description
 import newpipe.shared.generated.resources.desktop_upstream_title
 import newpipe.shared.generated.resources.ic_newpipe_logo
 import newpipe.shared.generated.resources.open_in_browser
-import newpipe.shared.generated.resources.view_on_github
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -113,12 +111,6 @@ fun AboutPageContent(
 
 @Composable
 private fun defaultLinks() = listOf(
-    Link(
-        title = "BoitierTube Desktop",
-        description = stringResource(Res.string.desktop_source_description),
-        action = stringResource(Res.string.view_on_github),
-        url = "https://github.com/Boitier13/NewPipe"
-    ),
     Link(
         title = stringResource(Res.string.desktop_upstream_title),
         description = stringResource(Res.string.desktop_upstream_description),

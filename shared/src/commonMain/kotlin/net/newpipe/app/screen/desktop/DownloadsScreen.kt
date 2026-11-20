@@ -40,6 +40,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.roundToInt
 import net.newpipe.app.model.DownloadStatus
 import net.newpipe.app.viewmodel.desktop.DownloadsViewModel
+import newpipe.shared.generated.resources.post_download_destinations
+import newpipe.shared.generated.resources.post_queue_hint
+import newpipe.shared.generated.resources.post_queued
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.desktop_clear_completed
 import newpipe.shared.generated.resources.desktop_accessibility_play
@@ -81,6 +84,9 @@ fun DownloadsScreen(
                 }
             }
         }
+
+        Text(stringResource(Res.string.post_download_destinations), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(Res.string.post_queue_hint), style = MaterialTheme.typography.bodySmall)
 
         if (!ffmpegOk) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -149,10 +155,12 @@ fun DownloadsScreen(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                    val queuedLabel = stringResource(Res.string.post_queued)
                                     val sub = buildString {
                                         append(task.uploader)
                                         task.resolutionLabel?.let { append(" • $it") }
-                                        task.statusMessage?.let { append(" • $it") }
+                                        if (task.status == DownloadStatus.QUEUED) append(" • " + queuedLabel)
+                                        else task.statusMessage?.let { append(" • $it") }
                                         if (task.status == DownloadStatus.COMPLETED && task.totalBytes > 0L) {
                                             append(" (${formatBytes(task.totalBytes)})")
                                         }

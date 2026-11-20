@@ -50,23 +50,9 @@ object WindowsAppPaths {
 
     fun downloadLogFile(): File = profileFile("download_mux.log")
 
-    fun defaultVideoDownloadDir(): File {
-        val dir = PortableProfile.dataDirectory()?.let { PortableProfile.resolve(it, "downloads/Video") }
-            ?: File(System.getProperty("user.home"), "Downloads/NewPipe/Video")
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        return dir
-    }
+    fun defaultVideoDownloadDir(): File = DownloadDestinations.folder(DownloadDestinations.documentsDirectory(), video = true)
 
-    fun defaultAudioDownloadDir(): File {
-        val dir = PortableProfile.dataDirectory()?.let { PortableProfile.resolve(it, "downloads/Audio") }
-            ?: File(System.getProperty("user.home"), "Downloads/NewPipe/Audio")
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        return dir
-    }
+    fun defaultAudioDownloadDir(): File = DownloadDestinations.folder(DownloadDestinations.documentsDirectory(), video = false)
 
     fun tempDownloadDir(): File {
         val dir = profileFile("tmp_downloads")

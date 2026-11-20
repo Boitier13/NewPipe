@@ -5,6 +5,9 @@
 
 package net.newpipe.app.screen.desktop
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +64,8 @@ import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.platform.BackupRestoreActions
 import net.newpipe.app.viewmodel.desktop.SubscriptionsViewModel
+import newpipe.shared.generated.resources.post_subscription_intro
+import newpipe.shared.generated.resources.post_subscription_guide
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.cancel
 import newpipe.shared.generated.resources.desktop_choose_file
@@ -127,6 +132,11 @@ fun SubscriptionsScreen(
                     Text(stringResource(Res.string.desktop_refresh_feed))
                 }
             }
+        }
+
+        Text(stringResource(Res.string.post_subscription_intro), style = MaterialTheme.typography.bodySmall)
+        TextButton(onClick = { showImportDialog = true }) {
+            Text(stringResource(Res.string.post_subscription_guide))
         }
 
         val statusText = when {
@@ -310,7 +320,9 @@ fun SubscriptionsScreen(
         AlertDialog(
             onDismissRequest = { showImportDialog = false },
             title = { Text(stringResource(Res.string.desktop_import_subscriptions_title)) },
-            text = { Text(stringResource(Res.string.desktop_subscription_import_description)) },
+            text = { Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                Text(stringResource(Res.string.desktop_subscription_import_description))
+            } },
             confirmButton = {
                 Button(onClick = pickSubscriptionsFile) {
                     Text(stringResource(Res.string.desktop_choose_file))

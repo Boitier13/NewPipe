@@ -501,7 +501,11 @@ class JVMDesktopDatabase(
     override suspend fun importSubscriptionsJson(filePath: String): Result<Int> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val raw = File(filePath).readText(Charsets.UTF_8).trimStart('\uFEFF')
+                val source = File(filePath)
+                require(source.isFile && source.length() in 1..(20L * 1024 * 1024)) {
+                    "Le fichier d’abonnements est vide, inaccessible ou trop volumineux."
+                }
+                val raw = source.readBytes().decodeToString(throwOnInvalidSequence = true).trimStart('\uFEFF')
                 val entries: List<NewPipeSubscriptionExportItem> =
                     if (filePath.endsWith(".csv", ignoreCase = true) || !raw.trimStart().startsWith("{")) {
                         parseTakeoutCsvSubscriptions(raw)
@@ -509,9 +513,12 @@ class JVMDesktopDatabase(
                         json.decodeFromString(NewPipeSubscriptionExportData.serializer(), raw).subscriptions
                     }
 
+                require(entries.isNotEmpty()) { "Aucun abonnement reconnu. Extrayez subscriptions.csv du ZIP Takeout, ou choisissez un export JSON d’abonnements." }
                 var count = 0
                 mutex.withLock {
                     val conn = ensureOpenLocked()
+                    conn.execSQL("BEGIN IMMEDIATE")
+                    try {
                     for (item in entries) {
                         if (item.url.isBlank()) continue
                         conn.prepare(
@@ -527,6 +534,11 @@ class JVMDesktopDatabase(
                             stmt.step()
                         }
                         count++
+                    }
+                    conn.execSQL("COMMIT")
+                    } catch (error: Exception) {
+                        runCatching { conn.execSQL("ROLLBACK") }
+                        throw error
                     }
                     _subscriptions.value = querySubscriptionsLocked(conn)
                 }
@@ -843,10 +855,7 @@ class JVMDesktopDatabase(
     companion object {
         internal fun parseTakeoutCsvSubscriptions(csvText: String): List<NewPipeSubscriptionExportItem> {
             val result = mutableListOf<NewPipeSubscriptionExportItem>()
-            for (rawLine in csvText.lineSequence()) {
-                val line = rawLine.trim()
-                if (line.isEmpty()) continue
-                val cols = parseCsvRow(line)
+            for (cols in parseCsvRows(csvText.trimStart('\uFEFF'))) {
                 if (cols.size < 2) continue
 
                 val col0 = cols[0].trim()
@@ -862,6 +871,8 @@ class JVMDesktopDatabase(
                 if (rawUrl.isBlank()) continue
 
                 val normalizedUrl = rawUrl.replaceFirst("http://", "https://", ignoreCase = true)
+                val parsedUrl = runCatching { java.net.URI(normalizedUrl) }.getOrNull()
+                if (parsedUrl?.scheme != "https" || parsedUrl.host?.lowercase() !in setOf("youtube.com", "www.youtube.com", "m.youtube.com")) continue
                 val title = col2.ifBlank {
                     col1.takeIf { it != rawUrl && it.isNotBlank() }
                         ?: col0.ifBlank { normalizedUrl }
@@ -875,32 +886,33 @@ class JVMDesktopDatabase(
             return result
         }
 
-        private fun parseCsvRow(line: String): List<String> {
+        private fun parseCsvRows(text: String): List<List<String>> {
+            val rows = mutableListOf<List<String>>()
             val fields = mutableListOf<String>()
-            val current = StringBuilder()
-            var inQuotes = false
-            var i = 0
-            while (i < line.length) {
-                val ch = line[i]
+            val value = StringBuilder()
+            var quoted = false
+            var index = 0
+            fun endField() { fields += value.toString(); value.setLength(0) }
+            fun endRow() { endField(); if (fields.any { it.isNotBlank() }) rows += fields.toList(); fields.clear() }
+            while (index < text.length) {
+                val ch = text[index]
                 when {
                     ch == '"' -> {
-                        if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
-                            current.append('"')
-                            i++
-                        } else {
-                            inQuotes = !inQuotes
-                        }
+                        if (quoted && index + 1 < text.length && text[index + 1] == '"') { value.append('"'); index++ }
+                        else quoted = !quoted
                     }
-                    ch == ',' && !inQuotes -> {
-                        fields += current.toString()
-                        current.setLength(0)
+                    ch == ',' && !quoted -> endField()
+                    (ch == '\n' || ch == '\r') && !quoted -> {
+                        endRow()
+                        if (ch == '\r' && index + 1 < text.length && text[index + 1] == '\n') index++
                     }
-                    else -> current.append(ch)
+                    else -> value.append(ch)
                 }
-                i++
+                index++
             }
-            fields += current.toString()
-            return fields
+            require(!quoted) { "Le fichier CSV est incomplet : guillemets non fermés." }
+            if (value.isNotEmpty() || fields.isNotEmpty()) endRow()
+            return rows
         }
     }
 }

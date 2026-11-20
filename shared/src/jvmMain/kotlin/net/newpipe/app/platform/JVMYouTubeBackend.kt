@@ -298,7 +298,7 @@ class JVMYouTubeBackend(
         url: String,
         forceReload: Boolean
     ): Result<VideoDetails> = withContext(Dispatchers.IO) {
-        ensureInitialized()
+        PlaybackDiagnostics.time("extracteur_initialisation") { ensureInitialized() }
         safeBackendCall("video '$url'") {
             println("[NewPipe] Extracting video details: $url")
             val yt = ServiceList.YouTube
@@ -308,10 +308,10 @@ class JVMYouTubeBackend(
                 infoCache.remove(yt.serviceId, url, DesktopInfoCache.Type.STREAM)
                 null
             }
-            val info = cached ?: StreamInfo.getInfo(yt, url).also {
+            val info = cached ?: PlaybackDiagnostics.time("youtube_extraction") { StreamInfo.getInfo(yt, url) }.also {
                 infoCache.put(yt.serviceId, url, it, DesktopInfoCache.Type.STREAM)
             }
-            mapStreamInfoToVideoDetails(info).also { details ->
+            PlaybackDiagnostics.time("selection_flux") { mapStreamInfoToVideoDetails(info) }.also { details ->
                 println(
                     "[NewPipe] Extracted '${details.title}': " +
                         "videos=${details.videoStreams.map { "${it.resolution}(${it.formatLabel})" }}, " +

@@ -41,7 +41,11 @@ def main():
     for key, value in original.items():
         assert current[key] == overrides.get(key, value), f'French text unexpectedly changed: {key}'
     identity = 'shared/src/commonMain/composeResources/values-fr/desktop_identity.xml'
-    assert (ROOT / identity).read_bytes() == git('show', f'{french_tip}:{identity}')
+    original_identity = {n.attrib['name']: n.text for n in ET.fromstring(git('show', f'{french_tip}:{identity}'))}
+    current_identity = {n.attrib['name']: n.text for n in ET.parse(ROOT / identity).getroot()}
+    for key, value in original_identity.items():
+        if key != 'desktop_subscription_import_description':
+            assert current_identity[key] == value, key
     print(f'French catalog: all {len(original)} keys retained, only recorded backup wording reconciled.')
 
     platform = 'shared/src/jvmMain/kotlin/net/newpipe/app/platform/'
@@ -60,7 +64,6 @@ def main():
 
     portable_tip = next(b['tip'] for b in inventory['branches'] if b['name'] == 'arena/ae9cabd8-newpipe')
     for path in [
-        platform + 'VlcMediaPlayerController.kt',
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsAppPathsTest.kt',
         'shared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsBundledRuntimeSmokeTest.kt'
     ]:

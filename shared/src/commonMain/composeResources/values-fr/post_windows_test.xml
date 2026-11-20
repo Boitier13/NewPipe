@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <string name="post_download_destinations">Par défaut, vos fichiers sont enregistrés dans Documents → BoitierTube → Vidéos ou Audios, même en mode portable. Les dossiers personnalisés choisis dans les paramètres restent prioritaires. Aucun ancien fichier n’est déplacé.</string>
+    <string name="post_queue_hint">Par défaut, une seule tâche audio ou vidéo s’exécute à la fois. Les autres attendent sans être bloquées. Vous pouvez autoriser jusqu’à trois tâches dans les paramètres de téléchargement ; sur un ancien PC, gardez la limite activée.</string>
+    <string name="post_queued">En attente d’une place dans la file</string>
+    <string name="post_subscription_intro">Aucune connexion Google dans BoitierTube : vos abonnements sont conservés sur cet ordinateur. Ajoutez une chaîne depuis sa page ou importez un fichier.</string>
+    <string name="post_subscription_guide">Guide d’importation</string>
+</resources>

@@ -31,8 +31,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import net.newpipe.app.model.AudioStreamOption
 import net.newpipe.app.model.DownloadFormat
 import net.newpipe.app.model.DownloadStatus
@@ -57,16 +55,11 @@ class JVMDownloadController(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
-    private val serialSemaphore = Semaphore(1)
-    private val parallelSemaphore = Semaphore(3)
+    private val queue = DownloadQueueGate {
+        if (settings.getBoolean(DownloadPreferences.KEY_LIMIT_QUEUE, DownloadPreferences.DEFAULT_LIMIT_QUEUE)) 1 else 3
+    }
+    private val outputNames = DownloadOutputNames()
     private val logLock = Any()
-
-    private fun queueSemaphore(): Semaphore =
-        if (settings.getBoolean(
-                DownloadPreferences.KEY_LIMIT_QUEUE,
-                DownloadPreferences.DEFAULT_LIMIT_QUEUE
-            )
-        ) serialSemaphore else parallelSemaphore
 
     // Mesure de vitesse par téléchargement : [instant (ms), octets, vitesse lissée (octets/s)]
     private val speedMarks = ConcurrentHashMap<String, LongArray>()
@@ -100,11 +93,15 @@ class JVMDownloadController(
         addTask(initial)
 
         val job = scope.launch {
-            queueSemaphore().withPermit {
+            queue.withPermit {
                 executeMp4Download(taskId, details, videoOption, outputFile)
             }
         }
         jobs[taskId] = job
+        job.invokeOnCompletion {
+            outputNames.release(outputFile)
+            jobs.remove(taskId, job)
+        }
     }
 
     override fun enqueueMp3(
@@ -202,7 +199,7 @@ class JVMDownloadController(
         addTask(initial)
 
         val job = scope.launch {
-            queueSemaphore().withPermit {
+            queue.withPermit {
                 executeAudioDownload(
                     taskId = taskId,
                     details = details,
@@ -214,6 +211,10 @@ class JVMDownloadController(
             }
         }
         jobs[taskId] = job
+        job.invokeOnCompletion {
+            outputNames.release(outputFile)
+            jobs.remove(taskId, job)
+        }
     }
 
     override fun cancelTask(taskId: String) {
@@ -1297,7 +1298,7 @@ class JVMDownloadController(
     private fun resolveVideoFolder(): File {
         val custom = settings.getString(DownloadPreferences.KEY_DOWNLOAD_FOLDER_VIDEO, "")
         return if (custom.isNotBlank()) {
-            File(custom).apply { mkdirs() }
+            DownloadDestinations.folder(File(System.getProperty("user.home")), video = true, customPath = custom)
         } else {
             WindowsAppPaths.defaultVideoDownloadDir()
         }
@@ -1306,7 +1307,7 @@ class JVMDownloadController(
     private fun resolveAudioFolder(): File {
         val custom = settings.getString(DownloadPreferences.KEY_DOWNLOAD_FOLDER_AUDIO, "")
         return if (custom.isNotBlank()) {
-            File(custom).apply { mkdirs() }
+            DownloadDestinations.folder(File(System.getProperty("user.home")), video = false, customPath = custom)
         } else {
             WindowsAppPaths.defaultAudioDownloadDir()
         }
@@ -1324,15 +1325,8 @@ class JVMDownloadController(
         return DesktopStreamHelper.sanitizeFilename(title, charset, replacement)
     }
 
-    private fun uniqueOutputFile(dir: File, baseName: String, extension: String): File {
-        var candidate = File(dir, "$baseName.$extension")
-        var idx = 1
-        while (candidate.exists()) {
-            candidate = File(dir, "$baseName ($idx).$extension")
-            idx++
-        }
-        return candidate
-    }
+    private fun uniqueOutputFile(dir: File, baseName: String, extension: String): File =
+        outputNames.reserve(dir, baseName, extension)
 
     private fun tempFile(prefix: String, suffix: String): File =
         File.createTempFile("${prefix}_", suffix, WindowsAppPaths.tempDownloadDir())
