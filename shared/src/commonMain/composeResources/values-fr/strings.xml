@@ -121,5 +121,8 @@
     <string name="desktop_import_subscriptions_title">Importer vos abonnements YouTube</string>
     <string name="desktop_import_subscriptions_desc">Pour protéger votre vie privée et la sécurité de votre compte, BoitierTube ne se connecte pas directement à Google. Pour retrouver vos abonnements YouTube ici :\n\n1. Ouvrez takeout.google.com et exportez YouTube → abonnements (subscriptions.csv), ou utilisez un fichier d'abonnements NewPipe (subscriptions.json).\n2. Cliquez sur Choisir un fichier ci-dessous pour importer vos chaînes localement.</string>
     <string name="desktop_choose_file">Choisir un fichier…</string>
+    <string name="desktop_accessibility_play">Lire</string>
+    <string name="desktop_accessibility_cancel">Annuler le téléchargement</string>
+    <string name="desktop_accessibility_remove">Retirer de la liste</string>
     <string name="desktop_import_subscriptions_success">%1$d abonnement(s) importé(s).</string>
 </resources>
