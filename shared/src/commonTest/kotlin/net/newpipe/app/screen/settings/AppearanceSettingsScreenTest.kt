@@ -7,6 +7,8 @@ package net.newpipe.app.screen.settings
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runComposeUiTest
 import com.russhwolf.settings.MapSettings
@@ -17,7 +19,10 @@ import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.settings_category_appearance_title
 import newpipe.shared.generated.resources.theme_title
 import newpipe.shared.generated.resources.auto_device_theme_title
-import newpipe.shared.generated.resources.night_theme_available
+import newpipe.shared.generated.resources.night_theme_title
+import newpipe.shared.generated.resources.light_theme_title
+import newpipe.shared.generated.resources.dark_theme_title
+import newpipe.shared.generated.resources.black_theme_title
 import org.jetbrains.compose.resources.getString
 import org.koin.dsl.module
 import kotlin.test.Test
@@ -42,19 +47,17 @@ class AppearanceSettingsScreenTest {
     }
 
     @Test
-    fun nightThemeShowsUnavailableSummaryWhenThemeNotAuto() = runComposeUiTest {
+    fun desktopOffersOnlyLightDarkAndSystem() = runComposeUiTest {
         withKoin(
             modules = listOf(emptySettings),
-            content = {
-                AppearanceSettingsScreenContent(theme = AppearancePreferences.THEME_DARK)
-            },
+            content = { AppearanceSettingsScreenContent() },
             onContent = {
-                onNodeWithText(
-                    getString(
-                        Res.string.night_theme_available,
-                        getString(Res.string.auto_device_theme_title)
-                    )
-                ).assertIsDisplayed()
+                onNodeWithText(getString(Res.string.night_theme_title)).assertDoesNotExist()
+                onNodeWithText(getString(Res.string.theme_title)).performClick()
+                onNodeWithText(getString(Res.string.light_theme_title)).assertIsDisplayed()
+                onNodeWithText(getString(Res.string.dark_theme_title)).assertIsDisplayed()
+                onNodeWithText(getString(Res.string.auto_device_theme_title)).assertIsDisplayed()
+                onNodeWithText(getString(Res.string.black_theme_title)).assertDoesNotExist()
             }
         )
     }

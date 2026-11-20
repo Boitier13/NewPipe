@@ -135,7 +135,11 @@ fun currentService(settings: Settings = koinInject()): Service {
 @Composable
 fun currentServiceScheme(
     isPreview: Boolean = LocalInspectionMode.current,
-    useDarkTheme: Boolean = isSystemInDarkTheme(),
+    useDarkTheme: Boolean = if (LocalInspectionMode.current) {
+        isSystemInDarkTheme()
+    } else {
+        currentColorScheme().background == backgroundDark
+    },
     service: Service = if (isPreview) Service.YOUTUBE else currentService()
 ): ColorScheme {
     return when {
