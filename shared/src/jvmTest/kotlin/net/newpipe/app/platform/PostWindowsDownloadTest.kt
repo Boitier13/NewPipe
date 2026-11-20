@@ -57,6 +57,7 @@ class PostWindowsDownloadTest {
         assertEquals("ancien", existing.readText())
         names.release(one)
         assertEquals(one, names.reserve(root, "Titre", "mp4"))
+        if (WindowsAppPaths.isWindows) assertEquals("titre (3).mp4", names.reserve(root, "titre", "mp4").name)
     }
 
     @Test fun singleQueueSharesCapacityBetweenTasksAndReleasesOnCancellation() = runBlocking {

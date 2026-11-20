@@ -83,6 +83,26 @@ class FinalAuditTests(unittest.TestCase):
         self.assertNotIn('VLC detected', source)
         self.assertIn('stringResource', source)
 
+    def test_user_interface_has_no_personal_github_link_and_keeps_licenses(self):
+        base = ROOT / 'shared/src/commonMain/kotlin/net/newpipe/app'
+        for path in (base / 'screen').rglob('*.kt'):
+            self.assertNotIn('github.com/Boitier13', path.read_text(encoding='utf-8'))
+        license_source = (base / 'screen/about/LicensePage.kt').read_text(encoding='utf-8')
+        self.assertIn('GPL-3.0-or-later', license_source)
+        self.assertIn('OFL-1.1', license_source)
+        self.assertIn('desktop_upstream_description', (base / 'screen/about/AboutPage.kt').read_text(encoding='utf-8'))
+
+    def test_documents_and_queue_contracts_are_explicit(self):
+        paths = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/WindowsAppPaths.kt')
+        self.assertIn('DownloadDestinations.documentsDirectory()', paths)
+        self.assertNotIn('"downloads/Video"', paths)
+        native = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/DownloadDestinations.kt')
+        self.assertIn('SHGetKnownFolderPath', native)
+        self.assertIn('Vidéos', native)
+        manager = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/JVMDownloadController.kt')
+        self.assertIn('DownloadQueueGate', manager)
+        self.assertNotIn('serialSemaphore', manager)
+
     def test_backup_bounds_and_schema_precede_live_changes(self):
         source = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/DesktopBackupStore.kt')
         for token in ['CRC32', 'decodeToString(throwOnInvalidSequence = true)', 'rejectDuplicateKeys',

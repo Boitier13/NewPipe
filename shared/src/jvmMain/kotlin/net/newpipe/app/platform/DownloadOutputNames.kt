@@ -6,16 +6,19 @@ import java.io.File
 /** Reserve names before a queued job creates its output; audio/video share this allocator. */
 internal class DownloadOutputNames {
     private val reserved = mutableSetOf<String>()
+    private fun key(file: File): String = file.canonicalPath.let {
+        if (WindowsAppPaths.isWindows) it.lowercase(java.util.Locale.ROOT) else it
+    }
 
     @Synchronized fun reserve(dir: File, name: String, extension: String): File {
         var index = 0
         while (true) {
             val suffix = if (index == 0) "" else " ($index)"
             val candidate = File(dir, "$name$suffix.$extension")
-            if (!candidate.exists() && reserved.add(candidate.canonicalPath)) return candidate
+            if (!candidate.exists() && reserved.add(key(candidate))) return candidate
             index++
         }
     }
 
-    @Synchronized fun release(file: File) { reserved.remove(file.canonicalPath) }
+    @Synchronized fun release(file: File) { reserved.remove(key(file)) }
 }
