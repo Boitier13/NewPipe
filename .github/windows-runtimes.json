@@ -1,0 +1,15 @@
+{
+  "ffmpeg": {
+    "version": "9.1",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.1/ffmpeg-9.1-essentials_build.7z",
+    "sha256": "835b9a733445ba7a56a37a26cf7bde84e2f3ce7da2a8ec984276bb2abb1b922c",
+    "size": 36671021,
+    "provenance": "GitHub release GyanD/codexffmpeg tag 9.1, asset digest retrieved via api.github.com on 2026-11-20"
+  },
+  "vlc": {
+    "version": "3.0.24",
+    "url": "https://download.videolan.org/pub/videolan/vlc/3.0.24/win64/vlc-3.0.24-win64.7z",
+    "sha256": "1ed59c09152e78aff84663fa76efab26057716576db74332858810e5ef54ae1f",
+    "provenance": "Official VideoLAN .7z.sha256 retrieved over HTTPS in Actions run 44751662213, runtime-provenance job on 2026-11-20; checksum publisher and archive share a trust domain, not an independently verified signature"
+  }
+}

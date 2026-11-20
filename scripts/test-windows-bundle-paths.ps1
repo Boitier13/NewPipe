@@ -19,6 +19,22 @@ try {
 } finally {
     Pop-Location
 }
+# SHA verification tests use synthetic bytes only; no downloaded content is executed.
+. (Join-Path $root '.github/scripts/runtime-integrity.ps1')
+$fixture = [IO.Path]::GetTempFileName()
+[IO.File]::WriteAllText($fixture, 'verified runtime fixture')
+$hash = (Get-FileHash $fixture -Algorithm SHA256).Hash.ToLowerInvariant()
+$length = (Get-Item $fixture).Length
+Assert-RuntimeArchive -Path $fixture -Sha256 $hash -ExpectedSize $length
+foreach ($case in @('checksum', 'truncated', 'empty')) {
+    $rejected = $false
+    try {
+        if ($case -eq 'checksum') { Assert-RuntimeArchive -Path $fixture -Sha256 ('0' * 64) }
+        elseif ($case -eq 'truncated') { Assert-RuntimeArchive -Path $fixture -Sha256 $hash -ExpectedSize ($length + 1) }
+        else { [IO.File]::WriteAllText($fixture, ''); Assert-RuntimeArchive -Path $fixture -Sha256 $hash }
+    } catch { $rejected = $true }
+    if (-not $rejected) { throw "Invalid archive accepted: $case" }
+}
 Write-Host 'PASS: expected output accepted, arbitrary output rejected; no files written.'
 
 # Actions propagates LASTEXITCODE: the last rejected child intentionally returned 1.

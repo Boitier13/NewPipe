@@ -64,171 +64,65 @@ if (-not $sevenZip) {
 }
 Write-Host "Using 7-Zip: $sevenZip"
 
-$ffmpegDest = Join-Path $resolvedOut "ffmpeg"
-$vlcDest = Join-Path $resolvedOut "vlc"
-if (Test-Path $resolvedOut) {
-    Remove-Item -Recurse -Force $resolvedOut
-}
-New-Item -ItemType Directory -Force -Path $ffmpegDest, $vlcDest | Out-Null
-
+# Never erase an existing bundle. A failed verification must leave previous output intact.
+if (Test-Path -LiteralPath $resolvedOut) { throw "Output already exists; preserve it and prepare from a clean checkout: $resolvedOut" }
+$manifestPath = Join-Path $repositoryRoot '.github/windows-runtimes.json'
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+. (Join-Path $PSScriptRoot 'runtime-integrity.ps1')
 $workBase = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
-# A unique workspace avoids deleting another build's or user's temporary directory.
 $workDir = Join-Path $workBase ("boitiertube-win-bundle-" + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+New-Item -ItemType Directory -Path $workDir | Out-Null
+$stage = Join-Path $workDir 'verified-bundle'
+New-Item -ItemType Directory -Path $stage | Out-Null
 
-try {
-    Write-Host "=== Downloading portable FFmpeg (win64) ==="
-    $ghHeaders = @{ "User-Agent" = "NewPipe-Desktop-CI" }
-    if ($env:GITHUB_TOKEN) {
-        $ghHeaders["Authorization"] = "Bearer $($env:GITHUB_TOKEN)"
+foreach ($name in @('ffmpeg', 'vlc')) {
+    $spec = $manifest.$name
+    $uri = [uri]$spec.url
+    $allowedHost = if ($name -eq 'ffmpeg') { 'github.com' } else { 'download.videolan.org' }
+    if ($uri.Scheme -ne 'https' -or $uri.Host -ne $allowedHost -or $spec.sha256 -notmatch '^[0-9a-f]{64}$') {
+        throw "Invalid pinned provenance for $name"
     }
-
-    $ffmpegUrls = New-Object System.Collections.Generic.List[string]
-    try {
-        $gyanRelease = Invoke-WithRetry -Label "query GyanD/codexffmpeg release" -Action {
-            Invoke-RestMethod -Uri "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest" -Headers $ghHeaders
+    $archive = Join-Path $workDir "$name.7z"
+    Invoke-WithRetry -Label "download pinned $name $($spec.version)" -Action {
+        Invoke-WebRequest -Uri $spec.url -OutFile $archive
+    }
+    $length = (Get-Item -LiteralPath $archive).Length
+    if ($length -lt 5MB -or $length -gt 300MB) { throw "Invalid archive length for $name" }
+    if ($name -eq 'ffmpeg' -and $length -ne $spec.size) { throw 'Incomplete FFmpeg archive' }
+    # This gate precedes ALL extraction and execution of downloaded content.
+    $expectedSize = if ($name -eq 'ffmpeg') { [long]$spec.size } else { -1 }
+    Assert-RuntimeArchive -Path $archive -Sha256 $spec.sha256 -ExpectedSize $expectedSize
+    & $sevenZip t $archive | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Corrupt $name archive" }
+    $extract = Join-Path $workDir "$name-extracted"
+    & $sevenZip x $archive "-o$extract" -y | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Cannot extract $name archive" }
+    if (Get-ChildItem -LiteralPath $extract -Recurse -Force | Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 }) {
+        throw "Linked content in $name archive is not supported"
+    }
+    $binary = if ($name -eq 'ffmpeg') { 'ffmpeg.exe' } else { 'libvlc.dll' }
+    $found = @(Get-ChildItem -LiteralPath $extract -Recurse -File -Filter $binary)
+    if ($found.Count -ne 1) { throw "Expected exactly one $binary" }
+    # Preserve the complete upstream distribution, including licenses and notices.
+    $root = if ($name -eq 'ffmpeg') { $found[0].Directory.Parent.FullName } else { $found[0].Directory.FullName }
+    $destination = Join-Path $stage $name
+    New-Item -ItemType Directory -Path $destination | Out-Null
+    Copy-Item -Path (Join-Path $root '*') -Destination $destination -Recurse
+    if ($name -eq 'ffmpeg') {
+        # Keep the existing discovery contract ffmpeg/ffmpeg.exe.
+        Copy-Item -LiteralPath $found[0].FullName -Destination (Join-Path $destination 'ffmpeg.exe')
+        $version = & (Join-Path $destination 'ffmpeg.exe') -version 2>&1
+        if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch ([regex]::Escape("ffmpeg version $($spec.version)"))) {
+            throw 'Pinned FFmpeg executable failed version verification'
         }
-        $gyanAsset = @($gyanRelease.assets | Where-Object { $_.name -like "*-essentials_build.7z" }) | Select-Object -First 1
-        if ($null -ne $gyanAsset -and $gyanAsset.browser_download_url) {
-            $ffmpegUrls.Add($gyanAsset.browser_download_url)
+    } else {
+        foreach ($required in @('libvlccore.dll', 'plugins', 'COPYING.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing VLC component: $required" }
         }
-    } catch {
-        Write-Warning "GyanD GitHub API lookup failed: $($_.Exception.Message)"
-    }
-    $ffmpegUrls.Add("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.7z")
-
-    $ffmpegArchive = Join-Path $workDir "ffmpeg.7z"
-    $downloadedFfmpeg = $false
-    foreach ($url in $ffmpegUrls) {
-        try {
-            Write-Host "Fetching FFmpeg from: $url"
-            Invoke-WithRetry -Label "download FFmpeg ($url)" -Action {
-                Invoke-WebRequest -Uri $url -OutFile $ffmpegArchive -Headers @{ "User-Agent" = "NewPipe-Desktop-CI" }
-            }
-            if ((Test-Path $ffmpegArchive) -and (Get-Item $ffmpegArchive).Length -gt 5MB) {
-                $downloadedFfmpeg = $true
-                break
-            }
-        } catch {
-            Write-Warning "FFmpeg download from $url failed: $($_.Exception.Message)"
-        }
-    }
-    if (-not $downloadedFfmpeg) {
-        throw "Unable to download portable FFmpeg from any configured source"
-    }
-
-    $ffmpegExtract = Join-Path $workDir "ffmpeg-extract"
-    & $sevenZip x $ffmpegArchive "-o$ffmpegExtract" -y | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "7z extraction failed for FFmpeg (exit=$LASTEXITCODE)"
-    }
-
-    $ffmpegExeSrc = Get-ChildItem -Path $ffmpegExtract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
-    if ($null -eq $ffmpegExeSrc) {
-        throw "ffmpeg.exe not found in extracted archive"
-    }
-    $ffmpegExeDest = Join-Path $ffmpegDest "ffmpeg.exe"
-    Copy-Item -Path $ffmpegExeSrc.FullName -Destination $ffmpegExeDest -Force
-    $ffmpegVersionOutput = & $ffmpegExeDest -version 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "Bundled ffmpeg.exe smoke check failed (exit=$LASTEXITCODE)"
-    }
-    $ffmpegVersionOutput | Select-Object -First 2 | ForEach-Object { Write-Host $_ }
-    $ffmpegSizeMb = [Math]::Round((Get-Item $ffmpegExeDest).Length / 1MB, 1)
-    Write-Host "Bundled ffmpeg.exe ready ($ffmpegSizeMb MB)"
-
-    Write-Host "=== Downloading portable VLC (win64) ==="
-    $vlcUrls = New-Object System.Collections.Generic.List[string]
-    try {
-        $vlcIndex = Invoke-WithRetry -Label "fetch VideoLAN win64 index" -Action {
-            (Invoke-WebRequest -Uri "https://download.videolan.org/pub/videolan/vlc/last/win64/" -Headers @{ "User-Agent" = "NewPipe-Desktop-CI" }).Content
-        }
-        $match = [regex]::Match($vlcIndex, 'href="(vlc-[0-9A-Za-z._-]+-win64\.7z)"')
-        if ($match.Success) {
-            $vlcFileName = $match.Groups[1].Value
-            $vlcUrls.Add("https://download.videolan.org/pub/videolan/vlc/last/win64/$vlcFileName")
-        }
-    } catch {
-        Write-Warning "Failed to inspect VideoLAN last/win64 directory: $($_.Exception.Message)"
-    }
-    $vlcUrls.Add("https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.7z")
-
-    $vlcArchive = Join-Path $workDir "vlc.7z"
-    $downloadedVlc = $false
-    foreach ($url in $vlcUrls) {
-        try {
-            Write-Host "Fetching VLC from: $url"
-            Invoke-WithRetry -Label "download VLC ($url)" -Action {
-                Invoke-WebRequest -Uri $url -OutFile $vlcArchive -Headers @{ "User-Agent" = "NewPipe-Desktop-CI" }
-            }
-            if ((Test-Path $vlcArchive) -and (Get-Item $vlcArchive).Length -gt 10MB) {
-                $downloadedVlc = $true
-                break
-            }
-        } catch {
-            Write-Warning "VLC download from $url failed: $($_.Exception.Message)"
-        }
-    }
-    if (-not $downloadedVlc) {
-        throw "Unable to download portable VLC win64 archive from any configured source"
-    }
-
-    $vlcExtract = Join-Path $workDir "vlc-extract"
-    & $sevenZip x $vlcArchive "-o$vlcExtract" -y | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "7z extraction failed for VLC (exit=$LASTEXITCODE)"
-    }
-
-    $libVlcFile = Get-ChildItem -Path $vlcExtract -Recurse -Filter "libvlc.dll" | Select-Object -First 1
-    if ($null -eq $libVlcFile) {
-        throw "libvlc.dll not found in extracted VLC archive"
-    }
-    $vlcRoot = $libVlcFile.Directory.FullName
-    Write-Host "Extracted VLC root: $vlcRoot"
-
-    $libVlcCoreSrc = Join-Path $vlcRoot "libvlccore.dll"
-    $pluginsSrc = Join-Path $vlcRoot "plugins"
-    if (-not (Test-Path $libVlcCoreSrc) -or -not (Test-Path $pluginsSrc)) {
-        throw "Expected libvlccore.dll and plugins/ alongside libvlc.dll in $vlcRoot"
-    }
-
-    Copy-Item -Path $libVlcFile.FullName -Destination (Join-Path $vlcDest "libvlc.dll") -Force
-    Copy-Item -Path $libVlcCoreSrc -Destination (Join-Path $vlcDest "libvlccore.dll") -Force
-    Copy-Item -Path $pluginsSrc -Destination (Join-Path $vlcDest "plugins") -Recurse -Force
-
-    # Remove desktop Qt/skins GUI plugins unused by embedded libVLC playback.
-    $guiPluginsDir = Join-Path $vlcDest "plugins\gui"
-    if (Test-Path $guiPluginsDir) {
-        Remove-Item -Recurse -Force $guiPluginsDir
-    }
-
-    # Regenerate plugins.dat to match the pruned plugin set cleanly and prevent stale-cache delays.
-    $cacheGenSrc = Join-Path $vlcRoot "vlc-cache-gen.exe"
-    $pluginsDest = Join-Path $vlcDest "plugins"
-    $pluginsDat = Join-Path $pluginsDest "plugins.dat"
-    if (Test-Path $cacheGenSrc) {
-        $cacheGenTmp = Join-Path $vlcDest "vlc-cache-gen.exe"
-        Copy-Item -Path $cacheGenSrc -Destination $cacheGenTmp -Force
-        try {
-            & $cacheGenTmp $pluginsDest
-            if ($LASTEXITCODE -ne 0) {
-                Write-Warning "vlc-cache-gen.exe returned exit=$LASTEXITCODE; removing plugins.dat"
-                if (Test-Path $pluginsDat) { Remove-Item -Force $pluginsDat }
-            } else {
-                Write-Host "Regenerated VLC plugins.dat"
-            }
-        } finally {
-            if (Test-Path $cacheGenTmp) { Remove-Item -Force $cacheGenTmp }
-        }
-    } elseif (Test-Path $pluginsDat) {
-        Remove-Item -Force $pluginsDat
-    }
-
-    $vlcBytes = (Get-ChildItem -Path $vlcDest -Recurse -File | Measure-Object -Property Length -Sum).Sum
-    $vlcTotalMb = [Math]::Round($vlcBytes / 1MB, 1)
-    Write-Host "Bundled VLC ready ($vlcTotalMb MB across libvlc.dll, libvlccore.dll, plugins/)"
-} finally {
-    if (Test-Path $workDir) {
-        Remove-Item -Recurse -Force $workDir -ErrorAction SilentlyContinue
     }
 }
+Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $stage 'windows-runtimes.json')
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedOut) | Out-Null
+# Publish only after BOTH archives have passed verification. No existing output is overwritten.
+Move-Item -LiteralPath $stage -Destination $resolvedOut
+Write-Host "Pinned, verified runtime bundle published at $resolvedOut. Diagnostic downloads remain in $workDir"

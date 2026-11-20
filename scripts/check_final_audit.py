@@ -30,11 +30,11 @@ class FinalAuditTests(unittest.TestCase):
     def test_bundle_paths_checked_before_any_deletion_or_download(self):
         source = self.text('.github/scripts/prepare-windows-bundle.ps1')
         for guard in ['OutputDir must be the generated directory', 'ReparsePoint', 'if ($ValidatePathsOnly)']:
-            self.assertLess(source.index(guard), source.index('Remove-Item'))
-            self.assertLess(source.index(guard), source.index('Invoke-RestMethod'))
+            self.assertLess(source.index(guard), source.index('Invoke-WebRequest -Uri $spec.url'))
+        self.assertNotIn('Remove-Item', source)
+        self.assertLess(source.index('Assert-RuntimeArchive -Path $archive'), source.index('& $sevenZip t'))
         self.assertIn('Join-Path $repositoryRoot $OutputDir', source)
         self.assertIn('[guid]::NewGuid()', source)
-        self.assertNotIn('$workDir = Join-Path $workBase "newpipe-win-bundle"', source)
 
     def test_read_only_path_test_covers_rejected_and_accepted_paths(self):
         source = self.text('scripts/test-windows-bundle-paths.ps1')

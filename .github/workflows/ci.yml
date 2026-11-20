@@ -209,16 +209,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Inspect official VLC release and checksum
+      - uses: actions/checkout@v6
+      - name: Validate pinned runtime manifest
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $base = 'https://download.videolan.org/pub/videolan/vlc/last/win64/'
-          $index = (Invoke-WebRequest $base).Content
-          $match = [regex]::Match($index, 'href="(vlc-([0-9.]+)-win64\.7z)"')
-          if (-not $match.Success) { throw 'No official VLC archive found' }
-          $name = $match.Groups[1].Value
-          $version = $match.Groups[2].Value
-          $url = "https://download.videolan.org/pub/videolan/vlc/$version/win64/$name"
-          $checksum = (Invoke-WebRequest "$url.sha256").Content
-          Write-Host "::notice::VLC provenance: $url SHA256: $checksum"
+          $manifest = Get-Content .github/windows-runtimes.json -Raw | ConvertFrom-Json
+          foreach ($name in @('ffmpeg', 'vlc')) {
+            if ($manifest.$name.sha256 -notmatch '^[0-9a-f]{64}$') { throw "Invalid SHA256 for $name" }
+            Write-Host "Pinned $name $($manifest.$name.version) $($manifest.$name.url)"
+          }
