@@ -7,6 +7,7 @@ package net.newpipe.app.viewmodel.desktop
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -151,22 +152,28 @@ class VideoDetailViewModel(
 
     fun downloadMp4(option: VideoStreamOption) {
         val details = _uiState.value.details ?: return
-        runCatching { downloadController.enqueueMp4(details, option) }.onFailure {
-            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        viewModelScope.launch(Dispatchers.Default) {
+            runCatching { downloadController.enqueueMp4(details, option) }.onFailure {
+                _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+            }
         }
     }
 
     fun downloadMp3(option: AudioStreamOption, targetBitrateKbps: Int? = null) {
         val details = _uiState.value.details ?: return
-        runCatching { downloadController.enqueueMp3(details, option, targetBitrateKbps) }.onFailure {
-            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        viewModelScope.launch(Dispatchers.Default) {
+            runCatching { downloadController.enqueueMp3(details, option, targetBitrateKbps) }.onFailure {
+                _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+            }
         }
     }
 
     fun downloadNativeAudio(option: AudioStreamOption, targetBitrateKbps: Int? = null) {
         val details = _uiState.value.details ?: return
-        runCatching { downloadController.enqueueNativeAudio(details, option, targetBitrateKbps) }.onFailure {
-            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        viewModelScope.launch(Dispatchers.Default) {
+            runCatching { downloadController.enqueueNativeAudio(details, option, targetBitrateKbps) }.onFailure {
+                _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+            }
         }
     }
 
@@ -176,8 +183,10 @@ class VideoDetailViewModel(
         targetBitrateKbps: Int? = null
     ) {
         val details = _uiState.value.details ?: return
-        runCatching { downloadController.enqueueAudio(details, option, format, targetBitrateKbps) }.onFailure {
-            _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+        viewModelScope.launch(Dispatchers.Default) {
+            runCatching { downloadController.enqueueAudio(details, option, format, targetBitrateKbps) }.onFailure {
+                _uiState.update { state -> state.copy(errorMessage = "Impossible de préparer le téléchargement. Vérifiez le dossier choisi dans les paramètres et les droits d’accès.") }
+            }
         }
     }
 }
