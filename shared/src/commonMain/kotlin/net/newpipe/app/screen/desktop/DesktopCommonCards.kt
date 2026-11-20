@@ -48,6 +48,9 @@ import net.newpipe.app.model.PlaylistSummary
 import net.newpipe.app.model.StreamSummary
 import net.newpipe.app.platform.MediaPlayerController
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.desktop_accessibility_play
+import newpipe.shared.generated.resources.desktop_accessibility_pause
+import newpipe.shared.generated.resources.desktop_accessibility_stop
 import newpipe.shared.generated.resources.desktop_active_downloads
 import newpipe.shared.generated.resources.desktop_background_audio_active
 import newpipe.shared.generated.resources.desktop_switch_to_video
@@ -390,7 +393,7 @@ fun MiniPlayerBar(
                         painter = painterResource(
                             if (playerState.isPlaying) Res.drawable.ic_pause else Res.drawable.ic_play_arrow
                         ),
-                        contentDescription = if (playerState.isPlaying) "Pause" else "Play"
+                        contentDescription = stringResource(if (playerState.isPlaying) Res.string.desktop_accessibility_pause else Res.string.desktop_accessibility_play)
                     )
                 }
                 IconButton(onClick = { mediaPlayerController.seekBy(10_000L) }) {
@@ -402,7 +405,7 @@ fun MiniPlayerBar(
                 IconButton(onClick = { mediaPlayerController.stop() }) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_stop),
-                        contentDescription = "Stop"
+                        contentDescription = stringResource(Res.string.desktop_accessibility_stop)
                     )
                 }
             }

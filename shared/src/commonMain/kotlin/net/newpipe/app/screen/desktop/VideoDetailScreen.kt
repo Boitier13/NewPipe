@@ -89,6 +89,14 @@ import net.newpipe.app.viewmodel.desktop.VideoDetailViewModel
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.cancel
 import newpipe.shared.generated.resources.desktop_audio_bitrate
+import newpipe.shared.generated.resources.desktop_accessibility_back
+import newpipe.shared.generated.resources.desktop_accessibility_reload
+import newpipe.shared.generated.resources.desktop_accessibility_detect_vlc
+import newpipe.shared.generated.resources.desktop_accessibility_settings
+import newpipe.shared.generated.resources.desktop_accessibility_play
+import newpipe.shared.generated.resources.desktop_accessibility_pause
+import newpipe.shared.generated.resources.desktop_accessibility_mute
+import newpipe.shared.generated.resources.desktop_accessibility_fullscreen
 import newpipe.shared.generated.resources.desktop_audio_format
 import newpipe.shared.generated.resources.desktop_audio_lossless
 import newpipe.shared.generated.resources.desktop_audio_original
@@ -194,7 +202,7 @@ fun VideoDetailScreen(
                 IconButton(onClick = { navigator.navigateUp() }) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_arrow_back),
-                        contentDescription = "Back"
+                        contentDescription = stringResource(Res.string.desktop_accessibility_back)
                     )
                 }
                 Text(
@@ -221,7 +229,7 @@ fun VideoDetailScreen(
                 IconButton(onClick = { viewModel.loadVideo(videoUrl, forceReload = true) }) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_refresh),
-                        contentDescription = "Reload"
+                        contentDescription = stringResource(Res.string.desktop_accessibility_reload)
                     )
                 }
             }
@@ -341,7 +349,7 @@ fun VideoDetailScreen(
                                                 )
                                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     Button(onClick = { viewModel.mediaPlayerController.recheckVlcAvailability() }) {
-                                                        Text("Re-detect VLC")
+                                                        Text(stringResource(Res.string.desktop_accessibility_detect_vlc))
                                                     }
                                                     OutlinedButton(
                                                         onClick = { navigator.navigateTo(Destination.VideoAudioSettings) }
@@ -352,7 +360,7 @@ fun VideoDetailScreen(
                                                             modifier = Modifier.size(16.dp)
                                                         )
                                                         Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("Settings")
+                                                        Text(stringResource(Res.string.desktop_accessibility_settings))
                                                     }
                                                 }
                                             }
@@ -686,7 +694,7 @@ private fun DesktopPlayerControlsBar(
                         painterResource(
                             if (playerState.isPlaying) Res.drawable.ic_pause else Res.drawable.ic_play_arrow
                         ),
-                        contentDescription = if (playerState.isPlaying) "Pause" else "Play"
+                        contentDescription = stringResource(if (playerState.isPlaying) Res.string.desktop_accessibility_pause else Res.string.desktop_accessibility_play)
                     )
                 }
                 IconButton(onClick = { viewModel.mediaPlayerController.seekBy(10_000L) }) {
@@ -702,7 +710,7 @@ private fun DesktopPlayerControlsBar(
                                 Res.drawable.ic_volume_up
                             }
                         ),
-                        contentDescription = "Mute"
+                        contentDescription = stringResource(Res.string.desktop_accessibility_mute)
                     )
                 }
                 Slider(
@@ -822,7 +830,7 @@ private fun DesktopPlayerControlsBar(
                                 Res.drawable.ic_fullscreen
                             }
                         ),
-                        contentDescription = "Fullscreen"
+                        contentDescription = stringResource(Res.string.desktop_accessibility_fullscreen)
                     )
                 }
             }

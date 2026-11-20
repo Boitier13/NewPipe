@@ -70,6 +70,10 @@ import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.platform.DataSaverController
 import net.newpipe.app.viewmodel.desktop.SearchViewModel
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.desktop_accessibility_clear
+import newpipe.shared.generated.resources.desktop_accessibility_search
+import newpipe.shared.generated.resources.desktop_accessibility_refresh
+import newpipe.shared.generated.resources.desktop_accessibility_remove_item
 import newpipe.shared.generated.resources.desktop_accountless_badge
 import newpipe.shared.generated.resources.desktop_data_saver
 import newpipe.shared.generated.resources.desktop_data_saver_on
@@ -166,14 +170,14 @@ fun DesktopHomeSearchScreen(
                                 ) {
                                     Icon(
                                         painter = painterResource(Res.drawable.ic_close),
-                                        contentDescription = "Clear"
+                                        contentDescription = stringResource(Res.string.desktop_accessibility_clear)
                                     )
                                 }
                             }
                             IconButton(onClick = { viewModel.submitSearch(textFieldValue.text) }) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_search),
-                                    contentDescription = "Search"
+                                    contentDescription = stringResource(Res.string.desktop_accessibility_search)
                                 )
                             }
                         }
@@ -295,7 +299,7 @@ fun DesktopHomeSearchScreen(
             ) {
                 Icon(
                     painter = painterResource(Res.drawable.ic_refresh),
-                    contentDescription = "Refresh"
+                    contentDescription = stringResource(Res.string.desktop_accessibility_refresh)
                 )
             }
         }
@@ -312,7 +316,7 @@ fun DesktopHomeSearchScreen(
                         trailingIcon = {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_close),
-                                contentDescription = "Remove",
+                                contentDescription = stringResource(Res.string.desktop_accessibility_remove_item),
                                 modifier = Modifier
                                     .size(14.dp)
                                     .clickable { viewModel.deleteSearchHistoryItem(pastQuery) }
