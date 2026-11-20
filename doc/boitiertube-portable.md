@@ -2,8 +2,12 @@
 
 Extraire **tout** le ZIP, puis ouvrir `Start-BoitierTube-Portable.cmd`.
 Le lanceur définit `BOITIERTUBE_PORTABLE_ROOT` uniquement pour ce processus.
-La base, les paramètres, les journaux, les fichiers temporaires de téléchargement et les
-répertoires de téléchargement par défaut sont placés dans `data` à côté du lanceur.
+La base, les paramètres, les journaux et les fichiers temporaires de téléchargement sont placés
+dans `data` à côté du lanceur. Après les premiers essais Windows 10, la destination par défaut des
+médias est désormais **Documents → BoitierTube → Vidéos / Audios**, y compris en mode portable.
+Documents est résolu par Windows, même s’il est redirigé. Les anciens fichiers restent à leur place
+et les dossiers personnellement choisis dans les paramètres restent prioritaires. Voir `GUIDE.md`
+dans le ZIP pour les téléchargements et l’import des abonnements.
 Ne pas lancer depuis l’archive ZIP. Le dossier doit être accessible en écriture.
 
 Ouvrir directement `BoitierTube.exe` conserve le comportement installé historique (profil

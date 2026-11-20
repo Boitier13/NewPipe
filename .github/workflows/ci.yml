@@ -223,6 +223,7 @@ jobs:
           if (-not (Test-Path "$appDir/BoitierTube.exe")) { throw "Missing distribution launcher" }
           Copy-Item scripts/Start-BoitierTube-Portable.cmd "$appDir/Start-BoitierTube-Portable.cmd"
           Copy-Item doc/boitiertube-portable.md "$appDir/PORTABLE.md"
+          Copy-Item doc/boitiertube-guide-quotidien.md "$appDir/GUIDE.md"
           Compress-Archive -Path $appDir -DestinationPath "desktopApp/build/BoitierTube-windows-x64.zip"
           Get-FileHash "desktopApp/build/BoitierTube-windows-x64.zip" -Algorithm SHA256 | Format-List
 
