@@ -17,7 +17,7 @@ class ProfilePrivacyTest {
         val alice = PortableProfile.dataDirectory(root.path, File(root, "users/alice").path, "alice")!!
         val bob = PortableProfile.dataDirectory(root.path, File(root, "users/bob").path, "bob")!!
         assertNotEquals(alice, bob)
-        assertTrue(alice.toPath().startsWith(File(root, "data/profiles").toPath()))
+        assertTrue(alice.toPath().startsWith(File(root, "data/profiles").canonicalFile.toPath()))
         assertFalse(File(alice, "newpipe.db").exists())
         PortableFilePreferences(File(alice, "preferences.checked-json")).use { one ->
             one.put("private", "alice-only")
