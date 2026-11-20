@@ -69,6 +69,7 @@ import newpipe.shared.generated.resources.desktop_import_subscriptions
 import newpipe.shared.generated.resources.desktop_subscription_import_description
 import newpipe.shared.generated.resources.desktop_import_subscriptions_success
 import newpipe.shared.generated.resources.desktop_import_subscriptions_title
+import newpipe.shared.generated.resources.desktop_accessibility_unsubscribe
 import newpipe.shared.generated.resources.desktop_nav_subscriptions
 import newpipe.shared.generated.resources.desktop_no_subscriptions
 import newpipe.shared.generated.resources.desktop_refresh_feed
@@ -255,7 +256,7 @@ fun SubscriptionsScreen(
                             IconButton(onClick = { viewModel.unsubscribe(sub) }) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_delete),
-                                    contentDescription = "Unsubscribe"
+                                    contentDescription = stringResource(Res.string.desktop_accessibility_unsubscribe)
                                 )
                             }
                         }
