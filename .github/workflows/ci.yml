@@ -89,6 +89,21 @@ jobs:
         shell: pwsh
         run: Copy-Item shared/build/test-results/jvmTest shared/build/full-jvm-test-results -Recurse
 
+      - name: Verify critical test suites actually ran
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = @{ DesktopBackupStoreTest = 19; DesktopRecoveryJournalTest = 4; PortableProfileTest = 6; DesktopDownloaderCookieTest = 4 }
+          foreach ($name in $expected.Keys) {
+            $path = "shared/build/full-jvm-test-results/TEST-net.newpipe.app.platform.$name.xml"
+            [xml]$report = Get-Content $path -Raw
+            $suite = $report.testsuite
+            if ([int]$suite.tests -lt $expected[$name] -or [int]$suite.failures -ne 0 -or [int]$suite.errors -ne 0 -or [int]$suite.skipped -ne 0) {
+              throw "Missing or unsuccessful critical tests: $name"
+            }
+            Write-Host "::notice::$name tests=$($suite.tests) failures=$($suite.failures) errors=$($suite.errors) skipped=$($suite.skipped)"
+          }
+
       - name: Run desktopApp checks
         shell: pwsh
         run: |

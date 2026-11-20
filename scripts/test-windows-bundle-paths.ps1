@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Read-only path validation: no downloads, output creation or cleanup.
+# Read-only output-path validation plus generated temporary hash fixtures; no downloads or cleanup.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
@@ -35,7 +35,7 @@ foreach ($case in @('checksum', 'truncated', 'empty')) {
     } catch { $rejected = $true }
     if (-not $rejected) { throw "Invalid archive accepted: $case" }
 }
-Write-Host 'PASS: expected output accepted, arbitrary output rejected; no files written.'
+Write-Host 'PASS: expected output accepted, arbitrary output rejected; hash validation rejects corrupt/incomplete fixtures.'
 
 # Actions propagates LASTEXITCODE: the last rejected child intentionally returned 1.
 exit 0
