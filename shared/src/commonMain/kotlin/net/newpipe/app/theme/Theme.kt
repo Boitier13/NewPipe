@@ -17,10 +17,8 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import com.russhwolf.settings.Settings
 import org.koin.compose.koinInject
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import com.russhwolf.settings.ObservableSettings
 import net.newpipe.app.preferences.AppearancePreferences
 
@@ -100,7 +98,8 @@ private val darkScheme = darkColorScheme(
     surfaceContainerHighest = surfaceContainerHighestDark
 )
 
-private val blackScheme = darkScheme.copy(surface = Color.Black)
+// Legacy black-theme preferences remain readable, but use the charcoal desktop palette.
+private val blackScheme = darkScheme
 
 /**
  * Gets current color scheme chosen by the user
@@ -173,6 +172,7 @@ fun AppTheme(
 ) {
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
+        typography = boitierTypography(),
         content = content
     )
 }

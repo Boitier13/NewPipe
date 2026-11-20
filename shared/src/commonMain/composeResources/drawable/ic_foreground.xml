@@ -1,15 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  ~ SPDX-FileCopyrightText: 2026 NewPipe e.V. <https://newpipe-ev.de>
-  ~ SPDX-License-Identifier: GPL-3.0-or-later
-  -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="470dp"
-    android:height="464dp"
-    android:viewportWidth="470"
-    android:viewportHeight="464">
-    <path
-        android:pathData="M144.1,388.93L191.69,358.59L192.69,157.51L315.15,230.22L226.54,281.32V339.8L410.63,230.22L143.85,73.44L144.1,388.93Z"
-        android:fillColor="#ffffff"
-        android:fillType="evenOdd"/>
+    android:width="128dp" android:height="128dp"
+    android:viewportWidth="128" android:viewportHeight="128">
+    <path android:fillColor="#0284B8" android:pathData="M4,31 Q4,4 31,4 H97 Q124,4 124,31 V97 Q124,124 97,124 H31 Q4,124 4,97 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M34,22 H66 C87,22 98,31 98,45 C98,54 93,60 86,63 C96,66 101,73 101,83 C101,98 88,106 67,106 H34 Z"/>
+    <path android:fillColor="#0284B8" android:pathData="M54,44 L83,64 L54,84 Z"/>
 </vector>

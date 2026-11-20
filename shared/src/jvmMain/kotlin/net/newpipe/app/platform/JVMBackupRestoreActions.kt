@@ -43,8 +43,8 @@ class JVMBackupRestoreActions(
                     val isSave = file == BackupFile.DATA_EXPORT || file == BackupFile.SUBSCRIPTIONS_EXPORT
                     val ext = if (file == BackupFile.DATA_EXPORT || file == BackupFile.DATA_IMPORT) "zip" else "json"
                     val dialogTitle = when (file) {
-                        BackupFile.DATA_EXPORT -> "Export NewPipe Backup"
-                        BackupFile.DATA_IMPORT -> "Import NewPipe Backup"
+                        BackupFile.DATA_EXPORT -> "Exporter une sauvegarde BoitierTube"
+                        BackupFile.DATA_IMPORT -> "Importer une sauvegarde BoitierTube / NewPipe"
                         BackupFile.SUBSCRIPTIONS_EXPORT -> "Export Subscriptions JSON"
                         BackupFile.SUBSCRIPTIONS_IMPORT -> "Import Subscriptions (CSV / JSON)"
                     }

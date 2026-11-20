@@ -19,53 +19,53 @@ import net.newpipe.app.Constants.KEY_STREAMING_SERVICE
 import org.koin.compose.koinInject
 
 val youTubeLightScheme = lightColorScheme(
-    primaryContainer = Color(0xFFE53935),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerLight,
+    onPrimaryContainer = onPrimaryContainerLight
 )
 
 val youTubeDarkScheme = darkColorScheme(
-    primaryContainer = Color(0xFF992722),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerDark,
+    onPrimaryContainer = onPrimaryContainerDark
 )
 
 val soundCloudLightScheme = lightColorScheme(
-    primaryContainer = Color(0xFFF57C00),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerLight,
+    onPrimaryContainer = onPrimaryContainerLight
 )
 
 val soundCloudDarkScheme = darkColorScheme(
-    primaryContainer = Color(0xFFA35300),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerDark,
+    onPrimaryContainer = onPrimaryContainerDark
 )
 
 val mediaCCCLightScheme = lightColorScheme(
-    primaryContainer = Color(0xFF9E9E9E),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerLight,
+    onPrimaryContainer = onPrimaryContainerLight
 )
 
 val mediaCCCDarkScheme = darkColorScheme(
-    primaryContainer = Color(0xFF878787),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerDark,
+    onPrimaryContainer = onPrimaryContainerDark
 )
 
 val peerTubeLightScheme = lightColorScheme(
-    primaryContainer = Color(0xFFFF6F00),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerLight,
+    onPrimaryContainer = onPrimaryContainerLight
 )
 
 val peerTubeDarkScheme = darkColorScheme(
-    primaryContainer = Color(0xFFA34700),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerDark,
+    onPrimaryContainer = onPrimaryContainerDark
 )
 
 val bandCampLightScheme = lightColorScheme(
-    primaryContainer = Color(0xFF17A0C4),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerLight,
+    onPrimaryContainer = onPrimaryContainerLight
 )
 
 val bandCampDarkScheme = darkColorScheme(
-    primaryContainer = Color(0xFF1383A1),
-    onPrimaryContainer = Color(0xFFFFFFFF)
+    primaryContainer = primaryContainerDark,
+    onPrimaryContainer = onPrimaryContainerDark
 )
 
 /**

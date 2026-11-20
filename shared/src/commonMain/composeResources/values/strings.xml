@@ -8,12 +8,12 @@
     <string name="navigate_back">Back</string>
 
     <!-- AboutScreen -->
-    <string name="title_activity_about">About NewPipe</string>
+    <string name="title_activity_about">About BoitierTube</string>
     <string name="title_licenses">Third-party Licenses</string>
     <string name="license">By %1$s under %2$s</string>
     <string name="tab_about">About \u0026 FAQ</string>
     <string name="tab_licenses">Licenses</string>
-    <string name="app_description">Libre lightweight streaming on Android.</string>
+    <string name="app_description">BoitierTube is a desktop application for discovering, searching and playing online video content.\n\nIt offers a simple, smooth and accessible experience, with a modern, customizable interface designed for computers.\n\nBoitierTube emphasizes ease of use, comfortable navigation and user control.</string>
     <string name="contribution_title">Contribute</string>
     <string name="contribution_encouragement">Whether you have ideas of; translation, design changes, code cleaning, or real heavy code changes—help is always welcome. The more is done the better it gets!</string>
     <string name="view_on_github">View on GitHub</string>
@@ -25,8 +25,8 @@
     <string name="privacy_policy_title">NewPipe's Privacy Policy</string>
     <string name="privacy_policy_encouragement">The NewPipe project takes your privacy very seriously. Therefore, the app does not collect any data without your consent.\nNewPipe's privacy policy explains in detail what data is sent and stored when you send a crash report.</string>
     <string name="read_privacy_policy">Read privacy policy</string>
-    <string name="app_license_title">NewPipe's License</string>
-    <string name="app_license">NewPipe is copyleft libre software: You can use, study, share, and improve it at will. Specifically you can redistribute and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.</string>
+    <string name="app_license_title">BoitierTube's License</string>
+    <string name="app_license">BoitierTube is copyleft libre software: You can use, study, share, and improve it at will. Specifically you can redistribute and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.</string>
     <string name="read_full_license">Read license</string>
     <string name="faq_title">Frequently asked questions</string>
     <string name="faq_description">If you are having trouble using the app, be sure to check out these answers to common questions!</string>
@@ -53,7 +53,7 @@
     <string name="light_theme_title">Light</string>
     <string name="dark_theme_title">Dark</string>
     <string name="black_theme_title">Black</string>
-    <string name="auto_device_theme_title">Automatic (device theme)</string>
+    <string name="auto_device_theme_title">System</string>
     <string name="night_theme_title">Night theme</string>
     <string name="night_theme_summary">Select your favorite night theme — %1$s</string>
     <string name="night_theme_available">This option is only available if %1$s is selected for Theme</string>
@@ -246,7 +246,7 @@
     <string name="delete_search_history_alert">Delete entire search history?</string>
     <string name="search_history_deleted">Search history deleted</string>
     <string name="clear_cookie_title">Clear reCAPTCHA cookies</string>
-    <string name="clear_cookie_summary">Clear cookies that NewPipe stores when you solve a reCAPTCHA</string>
+    <string name="clear_cookie_summary">Clear cookies that BoitierTube stores when you solve a reCAPTCHA</string>
     <string name="recaptcha_cookies_cleared">reCAPTCHA cookies have been cleared</string>
 
     <!-- Content Settings -->
@@ -409,7 +409,7 @@
     <string name="desktop_audio_lossless">Lossless / Uncompressed (FFmpeg)</string>
     <string name="desktop_import_subscriptions">Import YouTube (CSV / JSON)</string>
     <string name="desktop_import_subscriptions_title">Import YouTube Subscriptions</string>
-    <string name="desktop_import_subscriptions_desc">NewPipe does not connect directly to your Google account for privacy and security. To bring your YouTube subscriptions here:\n\n1. Open takeout.google.com and export YouTube → subscriptions (subscriptions.csv), or use a NewPipe subscriptions.json file.\n2. Click Choose File below to import all channels locally.</string>
+    <string name="desktop_import_subscriptions_desc">BoitierTube does not connect directly to your Google account for privacy and security. To bring your YouTube subscriptions here:\n\n1. Open takeout.google.com and export YouTube → subscriptions (subscriptions.csv), or use a NewPipe subscriptions.json file.\n2. Click Choose File below to import all channels locally.</string>
     <string name="desktop_choose_file">Choose File…</string>
     <string name="desktop_import_subscriptions_success">Imported %1$d subscription(s).</string>
 

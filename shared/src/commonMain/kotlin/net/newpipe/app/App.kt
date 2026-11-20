@@ -166,7 +166,7 @@ private fun DesktopShell(
                     header = {
                         Image(
                             painter = painterResource(Res.drawable.ic_newpipe_logo),
-                            contentDescription = "NewPipe",
+                            contentDescription = "BoitierTube",
                             modifier = Modifier.padding(top = 8.dp, bottom = 12.dp).size(36.dp)
                         )
                     },

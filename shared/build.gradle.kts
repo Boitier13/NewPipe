@@ -18,7 +18,7 @@ val buildConfigGenerator = tasks.register<Sync>("buildConfigGenerator") {
 
         object BuildConfig {
             const val VERSION_NAME = "$NEWPIPE_VERSION_NAME"
-            const val APP_NAME = "NewPipe"
+            const val APP_NAME = "BoitierTube"
         }
     """.trimIndent()
     from(resources.text.fromString(rawClass)) {

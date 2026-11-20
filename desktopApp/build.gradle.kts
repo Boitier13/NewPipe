@@ -33,19 +33,19 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
-            packageName = "NewPipe"
+            packageName = "BoitierTube"
             packageVersion = NEWPIPE_VERSION_NAME
-            description = "Libre lightweight streaming front-end for Windows"
-            vendor = "NewPipe e.V."
+            description = "BoitierTube video desktop client for Windows"
+            vendor = "BoitierTube"
             includeAllModules = true
 
             windows {
-                menuGroup = "NewPipe"
+                menuGroup = "BoitierTube"
                 shortcut = true
                 dirChooser = true
                 perUserInstall = true
                 upgradeUuid = "9a3d5a3e-6b4e-4d1c-9a51-202604010001"
-                iconFile.set(project.file("src/main/resources/newpipe.ico"))
+                iconFile.set(project.file("src/main/resources/boitiertube.ico"))
             }
         }
     }

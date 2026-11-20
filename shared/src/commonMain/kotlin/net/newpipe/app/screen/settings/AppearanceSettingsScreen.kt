@@ -13,18 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewWrapper
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
 import net.newpipe.app.composable.ListPreference
 import net.newpipe.app.composable.ListPreferenceEntry
 import net.newpipe.app.composable.PreferenceRow
@@ -38,7 +33,6 @@ import net.newpipe.app.viewmodel.settings.AppearanceSettingsViewModel
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.auto
 import newpipe.shared.generated.resources.auto_device_theme_title
-import newpipe.shared.generated.resources.black_theme_title
 import newpipe.shared.generated.resources.caption_setting_description
 import newpipe.shared.generated.resources.caption_setting_title
 import newpipe.shared.generated.resources.card
@@ -49,12 +43,8 @@ import newpipe.shared.generated.resources.list
 import newpipe.shared.generated.resources.list_view_mode
 import newpipe.shared.generated.resources.main_tabs_position_summary
 import newpipe.shared.generated.resources.main_tabs_position_title
-import newpipe.shared.generated.resources.night_theme_available
-import newpipe.shared.generated.resources.night_theme_summary
-import newpipe.shared.generated.resources.night_theme_title
 import newpipe.shared.generated.resources.off
 import newpipe.shared.generated.resources.on
-import newpipe.shared.generated.resources.select_night_theme_toast
 import newpipe.shared.generated.resources.settings_category_appearance_title
 import newpipe.shared.generated.resources.show_hold_to_append_summary
 import newpipe.shared.generated.resources.show_hold_to_append_title
@@ -115,19 +105,11 @@ fun AppearanceSettingsScreenContent(
     onCaptionSettingsClick: () -> Unit = {},
     onNavigateUp: () -> Unit = {}
 ) {
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val selectNightThemeMessage = stringResource(Res.string.select_night_theme_toast)
 
     val themeEntries = listOf(
         ListPreferenceEntry(AppearancePreferences.THEME_LIGHT, stringResource(Res.string.light_theme_title)),
         ListPreferenceEntry(AppearancePreferences.THEME_DARK, stringResource(Res.string.dark_theme_title)),
-        ListPreferenceEntry(AppearancePreferences.THEME_BLACK, stringResource(Res.string.black_theme_title)),
         ListPreferenceEntry(AppearancePreferences.THEME_AUTO_DEVICE, stringResource(Res.string.auto_device_theme_title))
-    )
-    val nightThemeEntries = listOf(
-        ListPreferenceEntry(AppearancePreferences.THEME_DARK, stringResource(Res.string.dark_theme_title)),
-        ListPreferenceEntry(AppearancePreferences.THEME_BLACK, stringResource(Res.string.black_theme_title))
     )
     val tabletModeEntries = listOf(
         ListPreferenceEntry(AppearancePreferences.TABLET_MODE_AUTO, stringResource(Res.string.auto)),
@@ -141,22 +123,13 @@ fun AppearanceSettingsScreenContent(
         ListPreferenceEntry(AppearancePreferences.LIST_VIEW_CARD, stringResource(Res.string.card))
     )
 
-    val nightThemeEnabled = theme == AppearancePreferences.THEME_AUTO_DEVICE
-    val nightThemeSummary = if (nightThemeEnabled) {
-        val selectedTitle = nightThemeEntries.firstOrNull { it.value == nightTheme }?.title.orEmpty()
-        stringResource(Res.string.night_theme_summary, selectedTitle)
-    } else {
-        stringResource(Res.string.night_theme_available, stringResource(Res.string.auto_device_theme_title))
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = stringResource(Res.string.settings_category_appearance_title),
                 onNavigateUp = onNavigateUp
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -168,21 +141,8 @@ fun AppearanceSettingsScreenContent(
             ListPreference(
                 title = stringResource(Res.string.theme_title),
                 entries = themeEntries,
-                selectedValue = theme,
-                onValueSelected = { value ->
-                    onThemeChange(value)
-                    if (value == AppearancePreferences.THEME_AUTO_DEVICE) {
-                        scope.launch { snackbarHostState.showSnackbar(selectNightThemeMessage) }
-                    }
-                }
-            )
-            ListPreference(
-                title = stringResource(Res.string.night_theme_title),
-                entries = nightThemeEntries,
-                selectedValue = nightTheme,
-                onValueSelected = onNightThemeChange,
-                summary = nightThemeSummary,
-                enabled = nightThemeEnabled
+                selectedValue = if (theme == AppearancePreferences.THEME_BLACK) AppearancePreferences.THEME_DARK else theme,
+                onValueSelected = onThemeChange
             )
             SwitchPreference(
                 title = stringResource(Res.string.show_hold_to_append_title),

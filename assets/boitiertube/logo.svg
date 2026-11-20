@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 128 128">
+  <title>BoitierTube — B + Play</title>
+  <rect x="4" y="4" width="120" height="120" rx="27" fill="#0284B8"/>
+  <path fill="#FFFFFF" d="M34 22 H66 C87 22 98 31 98 45 C98 54 93 60 86 63 C96 66 101 73 101 83 C101 98 88 106 67 106 H34 Z"/>
+  <path fill="#0284B8" d="M54 44 L83 64 L54 84 Z"/>
+</svg>
