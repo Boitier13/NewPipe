@@ -1,5 +1,11 @@
 # BoitierTube — audit final du 20 novembre 2026
 
+> **Mise à jour** : ce document décrit le bilan historique de l’audit. Les correctifs qui suivent
+> (runtimes épinglés/vérifiés, journal de récupération, mode portable isolé, traduction des réglages)
+> et leur validation sont consignés dans [le rapport avant Windows 10](boitiertube-correctifs-avant-windows10.md).
+> Utiliser ce nouveau rapport et ses artefacts pour les essais, pas les anciens installateurs ci-dessous.
+
+
 ## Conclusion et limites de preuve
 
 Audit des sources, de l’historique Git, des références GitHub, des contrats de ressources,

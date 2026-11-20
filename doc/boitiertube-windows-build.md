@@ -81,8 +81,8 @@ pwsh -File .\.github\scripts\prepare-windows-bundle.ps1
 
 Le script télécharge FFmpeg et VLC depuis leurs sources configurées (GitHub/Gyan/VideoLAN),
 prépare `desktopApp/app-resources/windows-x64/ffmpeg` et `vlc`, puis contrôle les exécutables.
-Il remplace son dossier de sortie : ne pas y conserver de fichiers personnels et ne pas
-lui donner un autre répertoire contenant des données. Prévoir réseau, espace disque et temps
+Il refuse un dossier de sortie déjà présent et ne supprime plus de sortie existante.
+Utiliser un checkout propre pour préparer un nouveau bundle, sans effacer l’ancien depuis ce script. Prévoir réseau, espace disque et temps
 supplémentaires. Il ne fait pas partie de `verify-windows.ps1` et n’installe pas Java ou WiX.
 
 La CI vérifie ensuite les fichiers et la configuration **BoitierTube.cfg** de la distribution,
@@ -190,9 +190,11 @@ Les surfaces vidéo noires et les voiles noirs translucides restent intentionnel
 
 Voir [l’audit final](boitiertube-audit-final.md) pour le SHA réellement testé, les défauts corrigés,
 les limites restantes et les liens des installateurs et du ZIP. La CI publie désormais aussi
-`boitiertube-windows-portable` : extraire le ZIP **entier** et lancer `BoitierTube.exe` dans son dossier.
-Ne pas déplacer l’EXE seul. Les données restent dans le profil Windows et Java Preferences :
-ce n’est pas un mode données isolées sur clé USB. Tester sur un profil de recette avant toute
+`boitiertube-windows-portable` : extraire le ZIP **entier** puis lancer
+`Start-BoitierTube-Portable.cmd` pour le profil isolé dans `data`. Le titre confirme le mode portable.
+Ouvrir directement `BoitierTube.exe` garde le profil installé historique. Ne pas déplacer l’EXE seul.
+Voir [les instructions portables](boitiertube-portable.md) et
+[les derniers correctifs/artefacts](boitiertube-correctifs-avant-windows10.md). Tester sur un profil de recette avant toute
 utilisation importante ; ne pas confondre le succès CI Windows Server avec une recette Windows 10.
 
 Contrôles supplémentaires sans Java :
