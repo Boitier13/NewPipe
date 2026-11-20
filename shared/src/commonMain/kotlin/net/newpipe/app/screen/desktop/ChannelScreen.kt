@@ -80,7 +80,7 @@ fun ChannelScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(onClick = { navigator.navigateUp() }) {
-                Icon(painterResource(Res.drawable.ic_arrow_back), contentDescription = "Back")
+                Icon(painterResource(Res.drawable.ic_arrow_back), contentDescription = stringResource(Res.string.desktop_accessibility_back))
             }
             Text(
                 text = state.channel?.name ?: initialName,
@@ -91,7 +91,7 @@ fun ChannelScreen(
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = { viewModel.loadChannel(channelUrl, forceReload = true) }) {
-                Icon(painterResource(Res.drawable.ic_refresh), contentDescription = "Refresh")
+                Icon(painterResource(Res.drawable.ic_refresh), contentDescription = stringResource(Res.string.desktop_accessibility_refresh))
             }
         }
 
