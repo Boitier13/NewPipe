@@ -37,6 +37,7 @@ compose.desktop {
             packageVersion = NEWPIPE_VERSION_NAME
             description = "BoitierTube video desktop client for Windows"
             vendor = "BoitierTube"
+            licenseFile.set(rootProject.file("LICENSE"))
             includeAllModules = true
 
             windows {

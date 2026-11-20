@@ -44,14 +44,20 @@ jobs:
           distribution: "temurin"
           cache: 'gradle'
 
-      - name: Run shared JVM tests and build desktop app
-        run: ./gradlew :shared:jvmTest :desktopApp:check :desktopApp:createDistributable --stacktrace
+      - name: Check desktop identity resources
+        run: python scripts/check_desktop_identity.py
 
-      - name: Package Windows MSI installer
-        run: ./gradlew :desktopApp:packageMsi --stacktrace
+      - name: Run shared JVM tests and build desktop app
+        run: ./gradlew :shared:jvmTest :desktopApp:build :desktopApp:createDistributable --stacktrace
+
+      - name: Package Windows MSI and EXE installers
+        run: ./gradlew :desktopApp:packageMsi :desktopApp:packageExe --stacktrace
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
         with:
-          name: newpipe-windows
-          path: desktopApp/build/compose/binaries/main/msi/*.msi
+          name: boitiertube-windows
+          if-no-files-found: error
+          path: |
+            desktopApp/build/compose/binaries/main/msi/*.msi
+            desktopApp/build/compose/binaries/main/exe/*.exe

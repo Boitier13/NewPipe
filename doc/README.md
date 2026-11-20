@@ -19,6 +19,8 @@ See [identity implementation and validation report](/doc/boitiertube-identity-re
 * **Watch & Search History**: Local SQLite watch history with resume timestamps and search history, plus NewPipe `.zip` / `.json` backup & restore.
 * **Data Saver Mode**: Caps playback resolution (configurable `144p`–`480p`), prefers audio-only/low-bitrate streams, and lowers thumbnail quality.
 
+See also [Windows build and validation guide](/doc/boitiertube-windows-build.md).
+
 ## Windows Prerequisites
 
 1. **JDK 21** (e.g., Eclipse Temurin 21)
