@@ -203,3 +203,22 @@ jobs:
             shared/build/reports/tests/**
             desktopApp/build/test-results/**
             desktopApp/build/reports/tests/**
+
+  runtime-provenance:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Inspect official VLC release and checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'https://download.videolan.org/pub/videolan/vlc/last/win64/'
+          $index = (Invoke-WebRequest $base).Content
+          $match = [regex]::Match($index, 'href="(vlc-([0-9.]+)-win64\.7z)"')
+          if (-not $match.Success) { throw 'No official VLC archive found' }
+          $name = $match.Groups[1].Value
+          $version = $match.Groups[2].Value
+          $url = "https://download.videolan.org/pub/videolan/vlc/$version/win64/$name"
+          $checksum = (Invoke-WebRequest "$url.sha256").Content
+          Write-Host "::notice::VLC provenance: $url SHA256: $checksum"
