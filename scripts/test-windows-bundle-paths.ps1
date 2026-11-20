@@ -20,3 +20,6 @@ try {
     Pop-Location
 }
 Write-Host 'PASS: expected output accepted, arbitrary output rejected; no files written.'
+
+# Actions propagates LASTEXITCODE: the last rejected child intentionally returned 1.
+exit 0
