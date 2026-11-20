@@ -33,14 +33,14 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
-            packageName = "NewPipe"
+            packageName = "BoitierTube"
             packageVersion = NEWPIPE_VERSION_NAME
-            description = "Libre lightweight streaming front-end for Windows"
-            vendor = "NewPipe e.V."
+            description = "Lecteur video libre pour ordinateur"
+            vendor = "BoitierTube"
             includeAllModules = true
 
             windows {
-                menuGroup = "NewPipe"
+                menuGroup = "BoitierTube"
                 shortcut = true
                 dirChooser = true
                 perUserInstall = true
