@@ -68,7 +68,7 @@ fun PlaylistScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(onClick = { navigator.navigateUp() }) {
-                Icon(painterResource(Res.drawable.ic_arrow_back), contentDescription = "Back")
+                Icon(painterResource(Res.drawable.ic_arrow_back), contentDescription = stringResource(Res.string.desktop_accessibility_back))
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
