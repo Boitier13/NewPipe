@@ -125,6 +125,7 @@ foreach ($name in @('ffmpeg', 'vlc')) {
     }
 }
 Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $stage 'windows-runtimes.json')
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'doc/boitiertube-runtime-provenance.md') -Destination (Join-Path $stage 'RUNTIME-PROVENANCE.md')
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedOut) | Out-Null
 # Publish only after BOTH archives have passed verification. No existing output is overwritten.
 Move-Item -LiteralPath $stage -Destination $resolvedOut

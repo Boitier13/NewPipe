@@ -44,6 +44,8 @@ fun main() {
             JOptionPane.showMessageDialog(null, failure.message, "Récupération BoitierTube", JOptionPane.ERROR_MESSAGE)
             return
         }
+        val windowTitle = if (System.getenv("BOITIERTUBE_PORTABLE_ROOT") != null)
+            "BoitierTube — mode portable" else "BoitierTube"
         application {
             var isWindowVisible by remember { mutableStateOf(true) }
             var isExiting by remember { mutableStateOf(false) }
@@ -75,7 +77,7 @@ fun main() {
             if (!isExiting && SystemTray.isSupported() && appIcon != null) {
                 Tray(
                     icon = appIcon,
-                    tooltip = "BoitierTube",
+                    tooltip = windowTitle,
                     onAction = { isWindowVisible = true },
                     menu = {
                         Item("Afficher BoitierTube", onClick = { isWindowVisible = true })
@@ -98,7 +100,7 @@ fun main() {
             Window(
                 visible = isWindowVisible,
                 onCloseRequest = handleWindowClose,
-                title = "BoitierTube",
+                title = windowTitle,
                 icon = appIcon,
                 state = windowState
             ) {

@@ -80,7 +80,8 @@ class DesktopIdentityTests(unittest.TestCase):
         self.assertIn('menuGroup = "BoitierTube"', gradle)
         self.assertIn('resources/boitiertube.ico', gradle)
         self.assertIn('"/boitiertube.png"', main)
-        self.assertIn('title = "BoitierTube"', main)
+        self.assertIn('title = windowTitle', main)
+        self.assertIn('"BoitierTube — mode portable" else "BoitierTube"', main)
         for old in ('newpipe.png', 'newpipe.ico'):
             self.assertNotIn(old, gradle + main)
             self.assertFalse((app / 'src/main/resources' / old).exists())
