@@ -132,6 +132,7 @@
     <string name="desktop_accessibility_pause">Mettre en pause</string>
     <string name="desktop_accessibility_mute">Couper ou rétablir le son</string>
     <string name="desktop_accessibility_fullscreen">Plein écran</string>
+    <string name="desktop_accessibility_stop">Arrêter la lecture</string>
     <string name="desktop_accessibility_resume">Reprendre à %1$s</string>
     <string name="desktop_accessibility_settings">Paramètres</string>
     <string name="desktop_accessibility_detect_vlc">Détecter VLC à nouveau</string>
