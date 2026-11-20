@@ -2,13 +2,13 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <resources>
     <string name="desktop_about_title">À propos de BoitierTube</string>
-    <string name="desktop_about_description">BoitierTube est une application de bureau dédiée à la découverte, à la recherche et à la lecture de contenus vidéo en ligne.\n\nSon objectif est de proposer une expérience simple, fluide et accessible, avec une interface moderne, personnalisable et adaptée aux ordinateurs.\n\nBoitierTube privilégie la simplicité d’utilisation, le confort de navigation et le contrôle de l’utilisateur sur son expérience.</string>
+    <string name="desktop_about_description">BoitierTube est une application de bureau dédiée à la découverte, à la recherche et à la lecture de contenus vidéo en ligne.\n\nElle propose une expérience simple, fluide et accessible, avec une interface moderne, personnalisable et conçue pour les ordinateurs.\n\nBoitierTube privilégie la simplicité d’utilisation, le confort de navigation et la liberté de l’utilisateur.</string>
     <string name="desktop_license_title">Licence de BoitierTube</string>
-    <string name="desktop_license_description">BoitierTube est un logiciel libre sous licence copyleft : vous pouvez l'utiliser, l'étudier, le partager et l'améliorer à votre guise. Plus précisément, vous pouvez le redistribuer et/ou le modifier selon les termes de la Licence publique générale GNU telle que publiée par la Free Software Foundation, soit la version 3 de la licence, soit (à votre choix) toute version ultérieure.</string>
-    <string name="desktop_source_description">Code source, suivi du projet et contributions.</string>
-    <string name="desktop_upstream_title">NewPipe — projet original</string>
-    <string name="desktop_upstream_description">BoitierTube est dérivé de NewPipe. © NewPipe contributors et NewPipe e.V. Licence GPL-3.0-or-later. Les licences des dépendances et de Source Sans 3 sont disponibles dans l’onglet Licences.</string>
-    <string name="desktop_subscription_import_description">Pour protéger votre vie privée et la sécurité de votre compte, BoitierTube ne se connecte pas directement à Google. Pour retrouver vos abonnements YouTube ici :\n\n1. Ouvrez takeout.google.com et exportez YouTube → abonnements (subscriptions.csv), ou utilisez un fichier NewPipe subscriptions.json.\n2. Cliquez sur Choisir un fichier ci-dessous pour importer toutes vos chaînes localement.</string>
-    <string name="desktop_system_theme">Système</string>
-    <string name="desktop_clear_cookie_summary">Effacer les cookies conservés par BoitierTube lors de la résolution d’un reCAPTCHA</string>
+    <string name="desktop_license_description">BoitierTube est un logiciel libre sous licence copyleft : vous pouvez l'utiliser, l'étudier, le partager et l'améliorer. Vous pouvez le redistribuer et/ou le modifier selon les termes de la Licence publique générale GNU (GPL), publiée par la Free Software Foundation, version 3 ou toute version ultérieure, à votre choix.</string>
+    <string name="desktop_source_description">Code source, suivi des problèmes et contributions.</string>
+    <string name="desktop_upstream_title">NewPipe — projet d'origine</string>
+    <string name="desktop_upstream_description">BoitierTube est dérivé du projet NewPipe. Copyright des contributeurs NewPipe et de NewPipe e.V. Licence GPL-3.0-or-later. Les licences des dépendances et de la police Source Sans 3 sont accessibles dans l’onglet Licences.</string>
+    <string name="desktop_subscription_import_description">Pour protéger votre vie privée et la sécurité de votre compte, BoitierTube ne se connecte pas directement à Google. Pour importer vos abonnements YouTube :\n\n1. Rendez-vous sur takeout.google.com et exportez YouTube → abonnements (subscriptions.csv), ou sélectionnez un fichier d'abonnements NewPipe (subscriptions.json).\n2. Cliquez sur Choisir un fichier ci-dessous pour importer vos chaînes sur cet ordinateur.</string>
+    <string name="desktop_system_theme">Thème système</string>
+    <string name="desktop_clear_cookie_summary">Effacer les cookies que BoitierTube a conservés lors de la résolution d'un reCAPTCHA.</string>
 </resources>
