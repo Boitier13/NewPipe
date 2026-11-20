@@ -70,6 +70,10 @@ import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.platform.DataSaverController
 import net.newpipe.app.viewmodel.desktop.SearchViewModel
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.desktop_accessibility_clear
+import newpipe.shared.generated.resources.desktop_accessibility_search
+import newpipe.shared.generated.resources.desktop_accessibility_refresh
+import newpipe.shared.generated.resources.desktop_accessibility_remove_item
 import newpipe.shared.generated.resources.desktop_accountless_badge
 import newpipe.shared.generated.resources.desktop_data_saver
 import newpipe.shared.generated.resources.desktop_data_saver_on
