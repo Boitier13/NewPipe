@@ -9,6 +9,10 @@ import java.io.IOException
 import java.net.Inet4Address
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.CompressionInterceptor
 import okhttp3.Dns
 import okhttp3.Gzip
@@ -35,7 +39,19 @@ class DesktopDownloader : Downloader() {
         all.sortedBy { if (it is Inet4Address) 0 else 1 }
     }
 
+    // Let OkHttp scope app-managed cookies on every request, including redirects.
+    // A raw Cookie header would otherwise survive cross-origin redirect follow-ups.
+    private val scopedCookies = object : CookieJar {
+        override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) = Unit
+
+        override fun loadForRequest(url: HttpUrl): List<Cookie> = getCookies(url.toString())
+            .split("; ")
+            .filter { it.isNotBlank() }
+            .mapNotNull { Cookie.parse(url, "$it; Path=/; Secure") }
+    }
+
     val client: OkHttpClient = OkHttpClient.Builder()
+        .cookieJar(scopedCookies)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
@@ -79,12 +95,10 @@ class DesktopDownloader : Downloader() {
     }
 
     fun getCookies(url: String): String {
-        val youtubeCookie = if (url.contains(YOUTUBE_DOMAIN)) {
-            getCookie(YOUTUBE_RESTRICTED_MODE_COOKIE_KEY)
-        } else {
-            null
-        }
-        return listOfNotNull(youtubeCookie, getCookie(RECAPTCHA_COOKIES_KEY))
+        val parsed = url.toHttpUrlOrNull() ?: return ""
+        if (parsed.scheme != "https" ||
+            (parsed.host != YOUTUBE_DOMAIN && !parsed.host.endsWith(".$YOUTUBE_DOMAIN"))) return ""
+        return listOfNotNull(getCookie(YOUTUBE_RESTRICTED_MODE_COOKIE_KEY), getCookie(RECAPTCHA_COOKIES_KEY))
             .flatMap { it.split(Regex("; *")) }
             .filter { it.isNotBlank() }
             .distinct()
@@ -114,11 +128,6 @@ class DesktopDownloader : Downloader() {
             .method(httpMethod, requestBody)
             .url(url)
             .addHeader("User-Agent", USER_AGENT)
-
-        val cookieHeader = getCookies(url)
-        if (cookieHeader.isNotEmpty()) {
-            builder.addHeader("Cookie", cookieHeader)
-        }
 
         headers.forEach { (name, values) ->
             builder.removeHeader(name)
