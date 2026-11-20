@@ -31,7 +31,7 @@
     <string name="search">Rechercher</string>
     <string name="content">Contenu</string>
     <string name="notifications">Notifications</string>
-    <string name="settings_category_video_audio_title">Vidéo et audio</string>
+    
     <string name="settings_category_downloads_title">Téléchargements</string>
     <string name="settings_category_appearance_title">Apparence</string>
     <string name="settings_category_history_title">Historique et cache</string>
