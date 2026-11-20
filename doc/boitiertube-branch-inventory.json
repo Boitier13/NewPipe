@@ -13,7 +13,8 @@
       ],
       "unique_commits_relative_to_initial_central": [],
       "changes_from_common_ancestor": [],
-      "paths_from_common_ancestor": []
+      "paths_from_common_ancestor": [],
+      "unique_commits_vs_other_six": []
     },
     {
       "name": "boitierTube/identity-redesign",
@@ -46,6 +47,16 @@
         "M\tshared/src/commonMain/composeResources/values-fr/strings.xml",
         "M\tshared/src/commonMain/composeResources/values/strings.xml",
         "M\tshared/src/commonMain/kotlin/net/newpipe/app/theme/Color.kt"
+      ],
+      "unique_commits_vs_other_six": [
+        "5dd7ccdd3cd460127022680f5984fca3576f9ff7 Renomme la fenêtre et le menu de BoitierTube",
+        "de54cec70fe8d7abccd4bf7e84dbb908724739c5 Renomme le paquet Windows BoitierTube",
+        "94cde3bae2037eea3bcabb674a0e0e5d05ecba0d Remplace la palette rouge par le bleu ciel et gris foncé",
+        "c0a09d6f9d4a7b702f8d6c7eed382223672de879 Réécrit la présentation française de BoitierTube",
+        "c7e28cd997a8de10df3f4d0a1913132fd7916247 Updates English BoitierTube About strings",
+        "d626b2cfac914038fa1cf04c8c517bc3d8879a7a Harmonise les couleurs de surface avec la palette bleu ciel",
+        "cffa46aa603c940ee4798af88386ea109d413bf7 Corrige et adapte la présentation À propos en français",
+        "3eec74a7c5fb9dc6e6c46fd59396b4f06e29bf3a Update BoitierTube About text in English"
       ]
     },
     {
@@ -109,6 +120,36 @@
         "M\tshared/src/commonMain/kotlin/net/newpipe/app/screen/desktop/PlaylistScreen.kt",
         "M\tshared/src/commonMain/kotlin/net/newpipe/app/screen/desktop/SubscriptionsScreen.kt",
         "M\tshared/src/commonMain/kotlin/net/newpipe/app/screen/desktop/VideoDetailScreen.kt"
+      ],
+      "unique_commits_vs_other_six": [
+        "83d4cc8f6875df2bf349adfbb253b346aa61ab49 Améliorer et franciser les textes de BoitierTube",
+        "bc93ff98c57aa3d66ce9e62fe11e013c83c8b8f6 Clarifier les textes français de l’identité de BoitierTube",
+        "a13e90a7a4131c019e7a8b57046e4066833bb8fe Ajouter des libellés français pour les actions de téléchargement",
+        "c3d143c6298a5cc072a50a30737a8816c77e7cbd Traduire les descriptions accessibles des actions de téléchargement",
+        "7dd4e39621e1482639cf99555362a2fb19f956d7 Ajouter les libellés français pour l'historique et le lecteur",
+        "4164d045b56fe170699c1adc1c48c0f939cc3695 Traduire les libellés d'accessibilité et de reprise dans l'historique",
+        "b3ff7e896e6730f34a351c68d29e751828e1dda8 Traduire les descriptions accessibles de la page Chaîne",
+        "429a17b86f3e7dd06690b12bc05404a614da9286 Traduire la description accessible du retour dans la liste de lecture",
+        "c98d17c15271d1945e89b966751d3aa1adb8edcc Traduire les libellés du lecteur vidéo et ses descriptions accessibles",
+        "15067cd81045319601b886a2992b0e2ca6c3abb5 Ajouter des libellés français pour la recherche et les abonnements",
+        "ee834abb290f30f1bf612d558ca79afcc172e62f Traduire les descriptions accessibles de recherche et d'accueil",
+        "31364601b8e79fbc0c8b7935493dea1194751d69 Traduire la description accessible du désabonnement",
+        "29467ab1b9a60405550fd7f6e3366432ec4707e8 Corriger les imports des libellés français",
+        "d0e2053405ab59d0b69ff5dc376048704cb8355d Corriger les imports des libellés français",
+        "e6c3651843cb264632adcc4ea49e404d51feb430 Corriger les imports des libellés français",
+        "d6ee0aff58d0d92932d6897df32304cf589b4b5d Préciser les libellés d'accessibilité du lecteur",
+        "bf0fb7371ec16f275850465005eceeeea8e0cd0e Adapter la description accessible selon l'état lecture ou pause",
+        "cbbcba4be3317704274f56ace9d31f220569497a Ajouter l'import du libellé de pause du lecteur",
+        "f3f1a58086acd2a0d3686d461416d82e7373380a Supprimer une clé de ressource française dupliquée",
+        "8b2bcadb2ea357b9c2caff20737a23aff2cd9d9b Traduire la description accessible de suppression dans l'historique des recherches",
+        "6592a0912ee1d10fff0ca1263cf430b60c0a11d6 Ajouter le libellé français d'arrêt du lecteur",
+        "cc64303088f2841007b1e10918a0bbfcabe5d3fc Traduire les commandes accessibles du mini-lecteur",
+        "630505c7c14e6fc844f71b6a3170ff9c6629c0e9 Fusionner les nouvelles traductions sans supprimer les ressources françaises existantes",
+        "015a32891b63c6d58ff096cf0103311fd66c12c1 Compléter la traduction française des paramètres du lecteur",
+        "03b76f010a962aac59472895b884e33cf330cb0a Supprimer la duplication du titre des paramètres vidéo et audio",
+        "b72f496cc5b31515e7d4eb96d4d3f69d519c43f7 Traduire les paramètres de sauvegarde et de contenu en français",
+        "b666d398f197cf1527d671618a593a235934376a Traduire les paramètres avancés, téléchargements et historique",
+        "2612512ef0a99b4937cf85b89e3746957bfc22c2 Compléter les dernières traductions françaises des ressources"
       ]
     },
     {
@@ -121,7 +162,11 @@
       ],
       "unique_commits_relative_to_initial_central": [],
       "changes_from_common_ancestor": [],
-      "paths_from_common_ancestor": []
+      "paths_from_common_ancestor": [],
+      "unique_commits_vs_other_six": [
+        "a7ff9fa216235dfad748c9bdc6b9dc038c22422d fix(backup): validate staged archives and roll back database and settings on failure",
+        "3488bbc7685500bee085a81513cb86a0b9fcd593 fix(backup): keep cleanup failures non-blocking and document recovery limits"
+      ]
     },
     {
       "name": "arena/4a0ce2e9-newpipe",
@@ -133,7 +178,8 @@
       ],
       "unique_commits_relative_to_initial_central": [],
       "changes_from_common_ancestor": [],
-      "paths_from_common_ancestor": []
+      "paths_from_common_ancestor": [],
+      "unique_commits_vs_other_six": []
     },
     {
       "name": "arena/7a8836d3-newpipe",
@@ -145,7 +191,8 @@
       ],
       "unique_commits_relative_to_initial_central": [],
       "changes_from_common_ancestor": [],
-      "paths_from_common_ancestor": []
+      "paths_from_common_ancestor": [],
+      "unique_commits_vs_other_six": []
     },
     {
       "name": "arena/ae9cabd8-newpipe",
@@ -182,6 +229,12 @@
         "M\tshared/src/jvmMain/kotlin/net/newpipe/app/platform/WindowsAppPaths.kt",
         "A\tshared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsAppPathsTest.kt",
         "A\tshared/src/jvmTest/kotlin/net/newpipe/app/platform/WindowsBundledRuntimeSmokeTest.kt"
+      ],
+      "unique_commits_vs_other_six": [
+        "2ccb3d939ca8abc849cbeb28bd7f5e6594e14d72 Bundle portable FFmpeg and VLC in Windows MSI installer",
+        "6f523616cd820ad8640925f55a033c66e31f811b Split Windows CI Gradle steps and surface failure details",
+        "60d946977199ce04aba5f628bc30a39c08e4d22c Extract exact Gradle and test failure lines in CI annotations",
+        "26f1912bc5a99c14a815a0a05fd959af10191286 Fix shadowed lambda variable in WindowsAppPaths.candidateVlcDirectories"
       ]
     }
   ],

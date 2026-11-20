@@ -56,6 +56,41 @@ Get-Command candle.exe, light.exe
 Le script ne télécharge ni Java, ni WiX, ni VLC. Un JRE seul ne suffit pas. Compiler d’abord sans
 `-Package` permet de distinguer un problème du projet d’un problème d’outillage WiX.
 
+## Préparer les runtimes portables après consolidation
+
+La branche centrale inclut maintenant le travail Arena de regroupement de VLC et FFmpeg.
+Le build déclare `desktopApp/app-resources` comme racine des ressources natives : ce dossier
+est ignoré par Git et les binaires ne sont pas inclus dans le dépôt.
+
+- **Développement avec VLC/FFmpeg installés séparément** : créer au minimum le dossier vide
+  avant `createDistributable`. La découverte des installations locales reste disponible.
+  Un installateur construit ainsi ne doit pas être présenté comme incluant les runtimes.
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\desktopApp\app-resources | Out-Null
+```
+
+- **Distribution avec runtimes inclus** : préparer les ressources avant de compiler/packager.
+  Installer 7-Zip et rendre `7z` accessible (ou utiliser son chemin standard). Pour cette
+  préparation réseau distincte, PowerShell 7 est recommandé ; la CI l’exécute avec `pwsh`.
+  L’exécution locale de ce script de préparation sous Windows PowerShell 5.1 n’est pas validée.
+
+```powershell
+pwsh -File .\.github\scripts\prepare-windows-bundle.ps1
+```
+
+Le script télécharge FFmpeg et VLC depuis leurs sources configurées (GitHub/Gyan/VideoLAN),
+prépare `desktopApp/app-resources/windows-x64/ffmpeg` et `vlc`, puis contrôle les exécutables.
+Il remplace son dossier de sortie : ne pas y conserver de fichiers personnels et ne pas
+lui donner un autre répertoire contenant des données. Prévoir réseau, espace disque et temps
+supplémentaires. Il ne fait pas partie de `verify-windows.ps1` et n’installe pas Java ou WiX.
+
+La CI vérifie ensuite les fichiers et la configuration **BoitierTube.cfg** de la distribution,
+puis exécute le smoke test VLC/FFmpeg réel. Hors CI, vérifier aussi le démarrage depuis le
+raccourci installé. Avant toute redistribution publique, contrôler les licences et obligations
+de redistribution des versions de VLC/FFmpeg téléchargées ; leur présence n’est pas une recette
+juridique ou Windows 10.
+
 ## Commandes
 
 Depuis la racine du dépôt, dans cette même fenêtre PowerShell :
@@ -106,6 +141,11 @@ Les sorties attendues se trouvent dans `desktopApp\build\compose\binaries\main\`
 Tester le raccourci et l’exécutable **installés**, pas seulement `gradlew run`, pour vérifier
 l’icône de la barre des tâches. Pour le mode Système sur Windows 10 : Paramètres → Personnalisation
 → Couleurs → choisir le mode d’application clair/sombre (le mode Windows seul peut différer).
+
+La CI Windows consolidée s’exécute aussi sur les pushes de `arena/1461b4cf-newpipe`.
+Son résultat courant et les erreurs corrigées sont consignés dans le
+[rapport de consolidation](boitiertube-consolidation.md). Les anciens bilans sans Java décrivent
+les étapes précédentes, pas une validation de la version actuelle.
 
 La CI Windows existante a été adaptée pour contrôler les ressources, construire et tester,
 puis générer et conserver les deux installateurs sous `boitiertube-windows`.
