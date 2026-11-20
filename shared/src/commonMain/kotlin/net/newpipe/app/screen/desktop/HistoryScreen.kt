@@ -237,7 +237,7 @@ fun HistoryScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(onClick = { viewModel.deleteSearchEntry(query) }) {
-                                    Icon(painterResource(Res.drawable.ic_delete), contentDescription = "Delete")
+                                    Icon(painterResource(Res.drawable.ic_delete), contentDescription = stringResource(Res.string.desktop_accessibility_delete))
                                 }
                             }
                         }
