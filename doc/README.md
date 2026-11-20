@@ -1,6 +1,10 @@
-<p align="center"><a href="https://newpipe.net"><img src="/assets/new_pipe_icon_5.png" width="150"></a></p>
-<h2 align="center"><b>NewPipe Desktop (Windows PC)</b></h2>
+<p align="center"><img src="/assets/boitiertube/logo.svg" width="150" alt="BoitierTube"></p>
+<h2 align="center"><b>BoitierTube Desktop (Windows PC)</b></h2>
 <h4 align="center">A libre lightweight YouTube desktop client for Windows built with Kotlin &amp; Compose Desktop.</h4>
+
+BoitierTube is a desktop customization of NewPipe. Original copyrights and GPL-3.0-or-later licensing are preserved.
+
+See [identity implementation and validation report](/doc/boitiertube-identity-report.md).
 
 ## Features
 
