@@ -70,6 +70,14 @@ jobs:
             exit 1
           }
 
+      - name: Audit source resources for private profile files
+        shell: pwsh
+        run: |
+          python scripts/test_distribution_privacy.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/audit_distribution_privacy.py desktopApp/src/main/resources shared/src/jvmMain/resources
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Download portable FFmpeg and VLC for Windows bundle
         shell: pwsh
         env:
@@ -235,6 +243,13 @@ jobs:
               throw "MSI size ($sizeMb MB) is unexpectedly small; bundled FFmpeg/VLC may be missing"
           }
 
+      - name: Inspect MSI and EXE payloads for private data
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem "desktopApp/build/compose/binaries/main/msi/*.msi" | Select-Object -First 1).FullName
+          $exe = (Get-ChildItem "desktopApp/build/compose/binaries/main/exe/*.exe" | Select-Object -First 1).FullName
+          ./scripts/verify-windows-package-privacy.ps1 -Msi $msi -Exe $exe
+
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
         with:
@@ -276,6 +291,8 @@ jobs:
               if (-not $reader.ReadToEnd().Contains("Commit : $env:GITHUB_SHA")) { throw 'Portable ZIP commit mismatch' }
             } finally { $reader.Dispose() }
           } finally { $zip.Dispose() }
+          python scripts/audit_distribution_privacy.py "desktopApp/build/BoitierTube-windows-x64.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Portable ZIP privacy audit failed' }
           Get-FileHash "desktopApp/build/BoitierTube-windows-x64.zip" -Algorithm SHA256 | Format-List
 
       - name: Upload runnable Windows ZIP

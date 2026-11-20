@@ -12,7 +12,9 @@ disque ou OneDrive, cette redirection est respectée. Les dossiers sont créés 
 votre compte n’est pas programmé dans l’application.
 
 Cette règle vaut aussi en mode portable : vos médias restent sur le PC, indépendamment du dossier
-extrait de l’application. La base, les paramètres et les journaux restent séparés dans `data`.
+extrait de l’application. La base, les paramètres et les journaux restent séparés dans `data/profiles/<identifiant de compte>`.
+Depuis la correction de confidentialité, aucun ancien profil NewPipe ou ancien `data` plat n’est
+repris automatiquement. Voir `PORTABLE.md` pour les profils et les précautions de partage.
 Déplacer BoitierTube ne déplace pas vos médias. Aucun ancien fichier de `data/downloads` n’est déplacé,
 supprimé ou écrasé par ce changement : vous pouvez toujours l’ouvrir manuellement dans l’Explorateur.
 
@@ -84,7 +86,7 @@ call Start-BoitierTube-Portable.cmd
 
 3. Ouvrez trois vidéos l’une après l’autre, sans cliquer rapidement pendant un démarrage.
 4. Notez approximativement le délai ressenti pour chacune, puis quittez complètement BoitierTube.
-5. Conservez `data\playback_startup.log`. Il contient des durées par étape, sans titres, adresses
+5. Conservez `playback_startup.log` dans votre sous-dossier `data\profiles\<identifiant de compte>`. Il contient des durées par étape, sans titres, adresses
    vidéo ou cookies. Fermer cette invite de commandes désactive ce réglage pour les lancements normaux.
 
 Les étapes séparent extraction YouTube, sélection des flux, détection et création du lecteur VLC,

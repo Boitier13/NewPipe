@@ -116,6 +116,20 @@ class FinalAuditTests(unittest.TestCase):
                       'Portable ZIP commit mismatch', 'FinalDownloadAuditTest = 3']:
             self.assertIn(token, workflow)
 
+    def test_profiles_never_open_legacy_installed_storage_or_root_preferences(self):
+        paths = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/WindowsAppPaths.kt')
+        self.assertNotIn('NewPipeDesktop', paths)
+        self.assertIn('File(appData, "BoitierTube")', paths)
+        settings = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/di/settings/SettingsModule.kt')
+        self.assertNotIn('Preferences.userRoot()', settings)
+        self.assertIn('PortableFilePreferences(File(WindowsAppPaths.appDataDir()', settings)
+        portable = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/PortableProfile.kt')
+        self.assertIn('data/profiles/$account', portable)
+        workflow = self.text('.github/workflows/ci.yml')
+        for token in ['PrivacyProfileSmokeTest', "@('fresh', 'reopen')", 'audit_distribution_privacy.py',
+                      'verify-windows-package-privacy.ps1']:
+            self.assertIn(token, workflow)
+
     def test_backup_bounds_and_schema_precede_live_changes(self):
         source = self.text('shared/src/jvmMain/kotlin/net/newpipe/app/platform/DesktopBackupStore.kt')
         for token in ['CRC32', 'decodeToString(throwOnInvalidSequence = true)', 'rejectDuplicateKeys',

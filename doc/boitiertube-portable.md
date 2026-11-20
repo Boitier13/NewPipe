@@ -1,38 +1,59 @@
-# Mode portable BoitierTube — activation explicite
+# BoitierTube — profils privés et mode portable
 
-Extraire **tout** le ZIP, puis ouvrir `Start-BoitierTube-Portable.cmd`.
-Le lanceur définit `BOITIERTUBE_PORTABLE_ROOT` uniquement pour ce processus.
-La base, les paramètres, les journaux et les fichiers temporaires de téléchargement sont placés
-dans `data` à côté du lanceur. Après les premiers essais Windows 10, la destination par défaut des
-médias est désormais **Documents → BoitierTube → Vidéos / Audios**, y compris en mode portable.
-Documents est résolu par Windows, même s’il est redirigé. Les anciens fichiers restent à leur place
-et les dossiers personnellement choisis dans les paramètres restent prioritaires. Voir `GUIDE.md`
-dans le ZIP pour les téléchargements et l’import des abonnements.
-Ne pas lancer depuis l’archive ZIP. Le dossier doit être accessible en écriture.
+Extraire **tout le ZIP officiel d’artefact**, puis ouvrir `Start-BoitierTube-Portable.cmd`.
+Ne pas lancer depuis l’archive. Le dossier extrait doit être accessible en écriture.
 
-Ouvrir directement `BoitierTube.exe` conserve le comportement installé historique (profil
-Windows / Java Preferences), sans copier ni migrer de données. Ne pas définir globalement
-`BOITIERTUBE_PORTABLE_ROOT` : c’est le lanceur qui doit sélectionner explicitement le mode.
-Les profils sont indépendants ; pour déplacer une bibliothèque, utiliser explicitement
-export puis restauration dans le bon mode et vérifier le résultat avant de réutiliser l’autre.
-La restauration remplace les données du profil cible et peut importer des chemins absolus :
-vérifier les chemins de téléchargement, VLC et FFmpeg après tout transfert entre machines.
+## Profils indépendants de NewPipe
 
-Le mode portable ne lit pas automatiquement les préférences installées. Les paramètres du profil
-portable sont enregistrés dans `data/preferences.checked-json` avec contrôle SHA-256 et publication
-atomique ; cela détecte des corruptions mais n’authentifie pas le propriétaire du fichier.
-Si les paramètres sont illisibles, le dossier non inscriptible ou le système de fichiers ne permet
-pas le remplacement atomique, l’application doit échouer plutôt que basculer dans le profil installé.
-Une seule instance doit ouvrir le profil portable à la fois (verrou de fichier).
+- MSI/EXE installé (ou EXE lancé directement) : `%APPDATA%\BoitierTube` sous Windows.
+- Lanceur portable : `<dossier extrait>\data\profiles\<identifiant de compte>`.
 
-Toujours fermer l’application puis éjecter proprement la clé USB. Ne pas retirer le support pendant
-une écriture ou une restauration. Un journal de restauration incomplet bloque l’ouverture et indique
-les copies de secours à conserver ; ne pas les supprimer ni renommer sans procédure de récupération.
-Le mode portable n’est pas un bac à sable : caches Java/OS, dialogues de fichiers, bibliothèques
-natives et chemins personnalisés peuvent encore utiliser des emplacements extérieurs. Les téléchargements
-avec un chemin explicitement personnalisé ne sont pas automatiquement déplacés.
+L’identifiant portable est une empreinte du dossier personnel et du nom de compte Windows. Deux
+comptes distincts ne sélectionnent pas le même profil par défaut dans une même extraction. Cela
+n’est ni un chiffrement ni une protection contre quelqu’un ayant accès aux fichiers. Le même
+compte Windows partagé par deux personnes ne permet pas de les distinguer.
 
-La compatibilité effective des clés USB (FAT/exFAT/NTFS), le retrait du support, la tray et la lecture
-interactive restent à tester sous Windows 10. Les MSI/EXE ne contiennent pas le lanceur portable :
-ils gardent le comportement installé normal. Aucun changement de version/format du profil installé
-n’est effectué et aucune migration du nœud racine Java n’est improvisée.
+Chaque profil contient sa base, ses paramètres, ses journaux et ses temporaires. Aucun ancien
+`NewPipeDesktop`, aucune préférence Java racine et aucun ancien profil portable plat `data` ne sont
+lus ou migrés automatiquement. La correction de confidentialité démarre donc avec un profil neuf
+par rapport aux anciennes versions utilisant ces emplacements. **Les anciens fichiers restent intacts.**
+
+Une mise à jour/réinstallation conserve ensuite les seules données du nouveau profil BoitierTube
+de ce compte : elle n’efface pas son historique à chaque lancement. Un autre compte Windows ou une
+extraction neuve reçoit un profil neuf. Changer de compte ou de PC peut sélectionner un autre profil
+portable ; aucun profil existant n’est recherché pour le recopier silencieusement.
+
+## Ne pas partager son dossier déjà utilisé
+
+Pour distribuer BoitierTube, partager le ZIP propre de CI ou l’installateur, **jamais son dossier
+portable déjà utilisé**, une sauvegarde ou son dossier Documents. Même si un autre compte n’ouvre
+pas automatiquement votre profil, les fichiers personnels copiés restent lisibles sur le support.
+Le pipeline refuse les profils, bases, configurations personnelles et téléchargements reconnaissables
+dans les packages générés, y compris les ressources JAR et les contenus des installateurs.
+
+## Téléchargements
+
+Les médias vont par défaut dans **Documents → BoitierTube → Vidéos / Audios**, hors du profil portable.
+Documents est résolu par Windows, même s’il est redirigé. Les chemins personnalisés choisis dans le
+nouveau profil restent prioritaires. Les anciens fichiers ne sont ni déplacés ni supprimés.
+
+## Précautions
+
+Le lanceur définit `BOITIERTUBE_PORTABLE_ROOT` uniquement pour son processus. Ne pas définir cette
+variable globalement. Un EXE lancé directement utilise le profil installé, pas le profil portable.
+Les paramètres des deux modes sont des fichiers `preferences.checked-json` distincts avec contrôle
+SHA-256 et publication atomique ; ce contrôle détecte la corruption, pas l’identité du propriétaire.
+Un profil inaccessible ou endommagé provoque une erreur, jamais un repli vers NewPipe.
+Une seule instance peut ouvrir un même profil à la fois.
+
+L’import/restauration reste une action **manuelle explicite** dans l’interface. Elle peut remplacer
+les données du profil cible et réintroduire les chemins de la sauvegarde choisie. Vérifier les
+chemins après une restauration ; aucune restauration n’est exécutée par le programme d’installation.
+Les noms techniques `newpipe.db` et `newpipe.json` des sauvegardes restent compatibles ; ils ne
+signifient pas qu’un ancien profil est consulté automatiquement.
+
+Fermer l’application puis éjecter proprement une clé USB. Une coupure pendant une écriture ou une
+restauration peut demander une récupération manuelle. Conserver les copies de secours signalées.
+Le mode portable n’est pas un bac à sable : bibliothèques natives, caches OS et dialogues de fichiers
+peuvent utiliser des emplacements extérieurs. La compatibilité des supports FAT/exFAT/NTFS et le
+lancement interactif Windows 10 restent distincts des tests automatisés Windows Server.
