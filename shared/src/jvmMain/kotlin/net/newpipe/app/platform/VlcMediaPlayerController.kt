@@ -207,19 +207,7 @@ class VlcMediaPlayerController(
     private fun ensureVlcDiscovered(): Boolean {
         if (discoveryAttempted.compareAndSet(false, true)) {
             val customPath = settings.getString(DesktopPreferences.KEY_VLC_PATH, "")
-            val candidateDirs = WindowsAppPaths.candidateVlcDirectories(customPath)
-            if (candidateDirs.isNotEmpty()) {
-                val existingJna = System.getProperty("jna.library.path").orEmpty()
-                val merged = (candidateDirs.map { it.absolutePath } +
-                    existingJna.split(File.pathSeparatorChar).filter { it.isNotBlank() })
-                    .distinct()
-                    .joinToString(File.pathSeparator)
-                System.setProperty("jna.library.path", merged)
-            }
-            val found = runCatching { NativeDiscovery().discover() }.getOrElse {
-                Logger.w(it) { "VLC NativeDiscovery failed" }
-                false
-            }
+            val found = discoverVlc(customPath).discovered
             _state.update {
                 it.copy(
                     vlcAvailable = found,
@@ -883,4 +871,57 @@ class VlcMediaPlayerController(
 
     private fun missingVlcMessage(): String =
         "VLC (libVLC) not found. Please install 64-bit VLC Media Player or set its folder in Settings."
+
+    internal data class VlcDiscoveryResult(
+        val discovered: Boolean,
+        val discoveredPath: String?,
+        val candidateDirectories: List<File>
+    )
+
+    companion object {
+        private fun preloadWindowsVlcCore(candidateDirs: List<File>) {
+            val primaryVlcDir = candidateDirs.firstOrNull {
+                WindowsAppPaths.hasVlcNativeLibraries(it, windows = true, mac = false)
+            } ?: return
+            val libVlcCore = File(primaryVlcDir, "libvlccore.dll")
+            runCatching {
+                System.load(libVlcCore.absolutePath)
+                Logger.d { "Preloaded Windows libvlccore from ${libVlcCore.absolutePath}" }
+            }.onFailure {
+                Logger.w(it) { "Failed to preload ${libVlcCore.absolutePath}" }
+            }
+        }
+
+        internal fun discoverVlc(
+            customPath: String? = null,
+            bundledDir: File? = WindowsAppPaths.bundledResourcesDir()
+        ): VlcDiscoveryResult {
+            val candidateDirs = WindowsAppPaths.candidateVlcDirectories(customPath, bundledDir)
+            if (candidateDirs.isNotEmpty()) {
+                val existingJna = System.getProperty("jna.library.path").orEmpty()
+                val merged = (candidateDirs.map { it.absolutePath } +
+                    existingJna.split(File.pathSeparatorChar).filter { it.isNotBlank() })
+                    .distinct()
+                    .joinToString(File.pathSeparator)
+                System.setProperty("jna.library.path", merged)
+
+                if (WindowsAppPaths.isWindows) {
+                    preloadWindowsVlcCore(candidateDirs)
+                }
+            }
+            val discovery = NativeDiscovery()
+            val found = runCatching { discovery.discover() }.getOrElse {
+                Logger.w(it) { "VLC NativeDiscovery failed" }
+                false
+            }
+            if (found) {
+                Logger.i { "VLC discovered at: ${discovery.discoveredPath() ?: "<system>"}" }
+            }
+            return VlcDiscoveryResult(
+                discovered = found,
+                discoveredPath = discovery.discoveredPath(),
+                candidateDirectories = candidateDirs
+            )
+        }
+    }
 }

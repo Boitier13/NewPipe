@@ -47,11 +47,110 @@ jobs:
       - name: Check desktop identity resources
         run: python scripts/check_desktop_identity.py
 
-      - name: Run shared JVM tests and build desktop app
-        run: ./gradlew :shared:jvmTest :desktopApp:build :desktopApp:createDistributable --stacktrace
+      - name: Download portable FFmpeg and VLC for Windows bundle
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./.github/scripts/prepare-windows-bundle.ps1
+
+      - name: Run shared JVM tests
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-shared-test.log"
+          ./gradlew :shared:jvmTest 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $errLines = @(Get-Content -Path $logFile | Select-String -Pattern '^e: |FAILURE:|What went wrong:|Execution failed|FAILED|^\s+at |Assertion|Exception' -Context 0,2 | ForEach-Object { $_.ToString() }) | Select-Object -First 60
+            $xmlErrors = @(Get-ChildItem -Path "shared/build/test-results" -Recurse -Filter "*.xml" -ErrorAction SilentlyContinue | Select-String -Pattern '<failure|<error' -Context 0,3 | ForEach-Object { $_.ToString() }) | Select-Object -First 30
+            $msg = ((($errLines + $xmlErrors) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            if (-not $msg) {
+              $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            }
+            Write-Host "::error::$msg"
+            exit $code
+          }
+
+      - name: Run desktopApp checks
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-desktop-check.log"
+          ./gradlew :desktopApp:check 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
+            exit $code
+          }
+
+      - name: Build desktop distributable
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-distributable.log"
+          ./gradlew :desktopApp:build :desktopApp:createDistributable 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
+            exit $code
+          }
+
+      - name: Verify bundled FFmpeg and VLC in distributable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $appDir = Join-Path $PWD "desktopApp/build/compose/binaries/main/app/BoitierTube/app"
+          $resDir = Join-Path $appDir "resources"
+          $cfgPath = Join-Path $appDir "BoitierTube.cfg"
+
+          if (-not (Test-Path $cfgPath)) { throw "Missing BoitierTube.cfg at $cfgPath" }
+          $cfgText = Get-Content -Path $cfgPath -Raw
+          if ($cfgText -notmatch 'compose\.application\.resources\.dir') {
+              throw "BoitierTube.cfg does not configure compose.application.resources.dir"
+          }
+
+          if (-not (Test-Path (Join-Path $resDir "ffmpeg/ffmpeg.exe"))) {
+              throw "Missing bundled ffmpeg.exe in $resDir"
+          }
+          if (-not (Test-Path (Join-Path $resDir "vlc/libvlc.dll")) -or
+              -not (Test-Path (Join-Path $resDir "vlc/libvlccore.dll")) -or
+              -not (Test-Path (Join-Path $resDir "vlc/plugins"))) {
+              throw "Missing bundled VLC DLLs/plugins in $resDir"
+          }
+
+          $env:NEWPIPE_VERIFY_BUNDLED_DIR = $resDir
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-smoke-test.log"
+          $ErrorActionPreference = 'Continue'
+          ./gradlew :shared:jvmTest --tests "net.newpipe.app.platform.WindowsBundledRuntimeSmokeTest" --rerun-tasks 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
+            exit $code
+          }
 
       - name: Package Windows MSI and EXE installers
-        run: ./gradlew :desktopApp:packageMsi :desktopApp:packageExe --stacktrace
+        shell: pwsh
+        run: |
+          $logFile = Join-Path $env:RUNNER_TEMP "gradle-msi.log"
+          ./gradlew :desktopApp:packageMsi :desktopApp:packageExe 2>&1 | Tee-Object -FilePath $logFile
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $msg = (((Get-Content -Path $logFile -Tail 60) -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A')
+            Write-Host "::error::$msg"
+            exit $code
+          }
+
+      - name: Verify Windows MSI installer artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = Get-ChildItem -Path "desktopApp/build/compose/binaries/main/msi/*.msi" | Select-Object -First 1
+          if (-not $msi) { throw "No MSI generated" }
+          $sizeMb = [Math]::Round($msi.Length / 1MB, 1)
+          Write-Host "Generated MSI: $($msi.Name) ($sizeMb MB)"
+          if ($sizeMb -lt 80) {
+              throw "MSI size ($sizeMb MB) is unexpectedly small; bundled FFmpeg/VLC may be missing"
+          }
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7

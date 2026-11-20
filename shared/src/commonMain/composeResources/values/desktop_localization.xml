@@ -2,21 +2,21 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <resources>
     <string name="desktop_accessibility_back">Back</string>
-    <string name="desktop_accessibility_cancel">Annuler le téléchargement</string>
-    <string name="desktop_accessibility_clear">Effacer le texte</string>
+    <string name="desktop_accessibility_cancel">Cancel download</string>
+    <string name="desktop_accessibility_clear">Clear text</string>
     <string name="desktop_accessibility_delete">Delete</string>
-    <string name="desktop_accessibility_detect_vlc">Détecter VLC à nouveau</string>
-    <string name="desktop_accessibility_fullscreen">Plein écran</string>
-    <string name="desktop_accessibility_mute">Couper ou rétablir le son</string>
+    <string name="desktop_accessibility_detect_vlc">Detect VLC again</string>
+    <string name="desktop_accessibility_fullscreen">Fullscreen</string>
+    <string name="desktop_accessibility_mute">Mute or unmute</string>
     <string name="desktop_accessibility_pause">Pause</string>
     <string name="desktop_accessibility_play">Play</string>
     <string name="desktop_accessibility_refresh">Refresh</string>
-    <string name="desktop_accessibility_reload">Recharger</string>
-    <string name="desktop_accessibility_remove">Retirer de la liste</string>
-    <string name="desktop_accessibility_remove_item">Retirer cet élément</string>
-    <string name="desktop_accessibility_resume">Reprendre à %1$s</string>
+    <string name="desktop_accessibility_reload">Reload</string>
+    <string name="desktop_accessibility_remove">Remove from list</string>
+    <string name="desktop_accessibility_remove_item">Remove this item</string>
+    <string name="desktop_accessibility_resume">Resume at %1$s</string>
     <string name="desktop_accessibility_search">Search</string>
-    <string name="desktop_accessibility_settings">Paramètres</string>
+    <string name="desktop_accessibility_settings">Settings</string>
     <string name="desktop_accessibility_stop">Stop</string>
     <string name="desktop_accessibility_unsubscribe">Unsubscribe</string>
 </resources>

@@ -78,12 +78,21 @@ class JVMPlayerSettingsSections(
             enabled = isDataSaver
         )
 
+        val hasBundledVlc = remember { WindowsAppPaths.bundledVlcDirectory() != null }
+        val hasBundledFfmpeg = remember { WindowsAppPaths.bundledFfmpegExecutable() != null }
+
         PreferenceCategoryTitle(title = "Windows Desktop (VLC & FFmpeg)")
         EditTextPreference(
             title = "VLC / libVLC folder path",
             value = vlcPath,
             summary = buildString {
-                append(if (vlcPath.isBlank()) "Auto-detect (Program Files\\VideoLAN\\VLC)" else vlcPath)
+                append(
+                    when {
+                        vlcPath.isNotBlank() -> vlcPath
+                        hasBundledVlc -> "Auto-detect (bundled)"
+                        else -> "Auto-detect (Program Files\\VideoLAN\\VLC)"
+                    }
+                )
                 append(if (playerState.vlcAvailable) " — VLC detected" else " — VLC not found")
             },
             onValueChange = { newPath ->
@@ -94,10 +103,16 @@ class JVMPlayerSettingsSections(
             }
         )
         EditTextPreference(
-            title = "FFmpeg executable path (for MP3 conversion)",
+            title = "FFmpeg executable path (for MP3 & video muxing)",
             value = ffmpegPath,
             summary = buildString {
-                append(if (ffmpegPath.isBlank()) "Auto-detect on PATH / winget" else ffmpegPath)
+                append(
+                    when {
+                        ffmpegPath.isNotBlank() -> ffmpegPath
+                        hasBundledFfmpeg -> "Auto-detect (bundled)"
+                        else -> "Auto-detect on PATH / winget"
+                    }
+                )
                 append(if (ffmpegFound) " — FFmpeg detected" else " — FFmpeg not found")
             },
             onValueChange = { newPath ->

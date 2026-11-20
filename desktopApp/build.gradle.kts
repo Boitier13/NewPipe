@@ -39,6 +39,7 @@ compose.desktop {
             vendor = "BoitierTube"
             licenseFile.set(rootProject.file("LICENSE"))
             includeAllModules = true
+            appResourcesRootDir.set(project.layout.projectDirectory.dir("app-resources"))
 
             windows {
                 menuGroup = "BoitierTube"
