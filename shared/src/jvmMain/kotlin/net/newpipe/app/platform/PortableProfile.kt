@@ -21,9 +21,18 @@ object PortableProfile {
         val directory = File(root)
         require(directory.isAbsolute && directory.isDirectory) { "Le dossier portable doit être un dossier absolu existant." }
         return File(directory.canonicalFile, "data").also {
+            check(it.canonicalFile.toPath().startsWith(directory.canonicalFile.toPath())) { "Le dossier data ne doit pas sortir du profil portable." }
             Files.createDirectories(it.toPath())
             check(it.isDirectory && it.canWrite()) { "Le profil portable est inaccessible : ${it.absolutePath}" }
         }
+    }
+
+    fun resolve(data: File, relative: String): File {
+        val result = File(data, relative)
+        check(result.canonicalFile.toPath().startsWith(data.canonicalFile.toPath())) {
+            "Un chemin du profil portable pointe vers un emplacement extérieur : $relative"
+        }
+        return result
     }
 }
 
@@ -32,7 +41,8 @@ object PortableProfile {
  * unsupported/read-only USB filesystems must fail instead of risking the last good settings.
  */
 internal class PortableFilePreferences(private val file: File) : AbstractPreferences(null, ""), AutoCloseable {
-    private val lockChannel = FileChannel.open(File(file.parentFile, ".portable-profile.lock").toPath(),
+    init { PortableProfile.resolve(file.parentFile, file.name) }
+    private val lockChannel = FileChannel.open(PortableProfile.resolve(file.parentFile, ".portable-profile.lock").toPath(),
         StandardOpenOption.CREATE, StandardOpenOption.WRITE)
     private val sessionLock = try {
         checkNotNull(lockChannel.tryLock()) { "Ce profil portable est déjà ouvert dans une autre instance." }

@@ -41,12 +41,17 @@ object WindowsAppPaths {
         return dir
     }
 
-    fun databaseFile(): File = File(appDataDir(), "newpipe.db")
+    private fun profileFile(relative: String): File {
+        val portable = PortableProfile.dataDirectory()
+        return if (portable == null) File(appDataDir(), relative) else PortableProfile.resolve(portable, relative)
+    }
 
-    fun downloadLogFile(): File = File(appDataDir(), "download_mux.log")
+    fun databaseFile(): File = profileFile("newpipe.db")
+
+    fun downloadLogFile(): File = profileFile("download_mux.log")
 
     fun defaultVideoDownloadDir(): File {
-        val dir = PortableProfile.dataDirectory()?.let { File(it, "downloads/Video") }
+        val dir = PortableProfile.dataDirectory()?.let { PortableProfile.resolve(it, "downloads/Video") }
             ?: File(System.getProperty("user.home"), "Downloads/NewPipe/Video")
         if (!dir.exists()) {
             dir.mkdirs()
@@ -55,7 +60,7 @@ object WindowsAppPaths {
     }
 
     fun defaultAudioDownloadDir(): File {
-        val dir = PortableProfile.dataDirectory()?.let { File(it, "downloads/Audio") }
+        val dir = PortableProfile.dataDirectory()?.let { PortableProfile.resolve(it, "downloads/Audio") }
             ?: File(System.getProperty("user.home"), "Downloads/NewPipe/Audio")
         if (!dir.exists()) {
             dir.mkdirs()
@@ -64,7 +69,7 @@ object WindowsAppPaths {
     }
 
     fun tempDownloadDir(): File {
-        val dir = File(appDataDir(), "tmp_downloads")
+        val dir = profileFile("tmp_downloads")
         if (!dir.exists()) {
             dir.mkdirs()
         }

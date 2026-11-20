@@ -23,6 +23,13 @@ class PortableProfileTest {
     }
 
     @Test
+    fun defaultProfilePathsCannotEscapeThroughParentTraversal() {
+        val data = PortableProfile.dataDirectory(Files.createTempDirectory("portable-paths-").toString())!!
+        assertFailsWith<IllegalStateException> { PortableProfile.resolve(data, "../installed.db") }
+        assertTrue(PortableProfile.resolve(data, "downloads/Video").canonicalFile.toPath().startsWith(data.toPath()))
+    }
+
+    @Test
     fun twoProfilesStayIsolatedAndRetainValuesOnReopen() {
         val first = PortableProfile.dataDirectory(Files.createTempDirectory("portable-one-").toString())!!
         val second = PortableProfile.dataDirectory(Files.createTempDirectory("portable-two-").toString())!!
