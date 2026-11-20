@@ -2,6 +2,11 @@
 param([Parameter(Mandatory = $true)][string]$Msi, [Parameter(Mandatory = $true)][string]$Exe)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+trap {
+    $detail = (($_ | Out-String) + $_.ScriptStackTrace) -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+    Write-Host "::error::$detail"
+    exit 1
+}
 
 # jpackage's EXE wraps an MSI in the read-only "msi" RT_RCDATA resource.
 # Do not execute the EXE, install a product, or modify the user's registry to inspect it.
