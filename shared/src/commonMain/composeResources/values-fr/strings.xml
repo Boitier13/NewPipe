@@ -134,5 +134,9 @@
     <string name="desktop_accessibility_resume">Reprendre à %1$s</string>
     <string name="desktop_accessibility_settings">Paramètres</string>
     <string name="desktop_accessibility_detect_vlc">Détecter VLC à nouveau</string>
+    <string name="desktop_accessibility_clear">Effacer le texte</string>
+    <string name="desktop_accessibility_search">Rechercher</string>
+    <string name="desktop_accessibility_remove_item">Retirer cet élément</string>
+    <string name="desktop_accessibility_unsubscribe">Se désabonner</string>
     <string name="desktop_import_subscriptions_success">%1$d abonnement(s) importé(s).</string>
 </resources>
